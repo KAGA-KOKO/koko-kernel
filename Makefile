@@ -408,6 +408,7 @@ KBUILD_AFLAGS_MODULE  := -DMODULE
 KBUILD_CFLAGS_MODULE  := -DMODULE
 KBUILD_LDFLAGS_MODULE := -T $(srctree)/scripts/module-common.lds
 GCC_PLUGINS_CFLAGS :=
+TARGET_BUILD_VARIANT := user
 
 #ifdef VENDOR_EDIT
 #Haiping.Zhong@PSW.AD.BuildConfig.BaseConfig.0, 2019/01/08, Add for build root disable dm verity
@@ -415,8 +416,6 @@ ifeq ($(OPPO_BUILD_ROOT_DISABLE_DM_VERITY),true)
     KBUILD_CFLAGS += -DOPPO_BUILD_ROOT_DISABLE_DM_VERITY
 endif
 #endif /* VENDOR_EDIT */
-
-
 
 #ifdef VENDOR_EDIT
 #Tong.Han@Bsp.Group.Stability, 2017/07/28, Add for aging test version config
@@ -437,6 +436,8 @@ KBUILD_CPPFLAGS += -DHANG_OPPO_ALL
 CFLAGS_KERNEL +=   -DHANG_OPPO_ALL
 CFLAGS_MODULE +=   -DHANG_OPPO_ALL
 endif
+#endif /* VENDOR_EDIT */
+
 #ifdef VENDOR_EDIT
 #Bin.Yan@PSW.AD.BuildConfig.BaseConfig.1068615, 2017/08/28,Add for disallow system remount
 ifneq ($(SPECIAL_OPPO_CONFIG),1)
@@ -480,7 +481,7 @@ ifeq ($(BUILD_CONFIG),release)
         OPPO_KMEMLEAK_TEST :=
     endif
 endif
-#endif
+#endif /* VENDOR_EDIT */
 
 #ifdef VENDOR_EDIT
 #Jianchao.Shi@PSW.BSP.CHG.Basic, 2018/12/13, sjc Add for recogonizing release build
@@ -507,7 +508,6 @@ CFLAGS_MODULE +=   -DVENDOR_EDIT
 #endif /* VENDOR_EDIT */
 
 
-
 #ifdef VENDOR_EDIT
 #runyu.ouyang@BSP.storage.sdcard, 2019/05/23, Add for sdcard
 ifneq ($(filter full_oppo6779_19011 full_oppo6779_19301, $(TARGET_PRODUCT)),)
@@ -516,7 +516,7 @@ KBUILD_CPPFLAGS += -DOPPO_P90M_SDCARD_FLAG
 CFLAGS_KERNEL +=   -DOPPO_P90M_SDCARD_FLAG
 CFLAGS_MODULE +=   -DOPPO_P90M_SDCARD_FLAG
 endif
-
+#endif /* VENDOR_EDIT */
 
 #ifdef VENDOR_EDIT
 #ye.zhang@Sensor.config,2016-09-09, add for CTSI support external storage or not
@@ -525,6 +525,7 @@ KBUILD_CFLAGS += -DMOUNT_EXSTORAGE_IF
 KBUILD_CPPFLAGS += -DMOUNT_EXSTORAGE_IF
 CFLAGS_KERNEL += -DMOUNT_EXSTORAGE_IF
 CFLAGS_MODULE += -DMOUNT_EXSTORAGE_IF
+#endif /* VENDOR_EDIT */
 
 #ifdef VENDOR_EDIT
 #Tong.Han@Bsp.Group.Stability, 2017/07/28, Add for aging test version config
@@ -532,6 +533,8 @@ ifeq ($(SPECIAL_OPPO_CONFIG),1)
 KBUILD_CFLAGS += -DCONFIG_OPPO_SPECIAL_BUILD
 endif
 #endif /* VENDOR_EDIT */
+
+# ifded VENDOR_EDIT
 #xing.xiong@BSP.Kernel.Driver, 2018/12/14, Add for recogonizing release build
 ifneq ($(filter release cts cta,$(OPPO_BUILD_TYPE)),)
 KBUILD_CFLAGS += -DOPPO_RELEASE_FLAG
@@ -552,14 +555,16 @@ KBUILD_CPPFLAGS += -DODM_HQ_EDIT
 CFLAGS_KERNEL   += -DODM_HQ_EDIT
 CFLAGS_MODULE   += -DODM_HQ_EDIT
 export ODM_HQ_EDIT=yes
-#endif
+#endif /* ODM_HQ_EDIT */
 
+# ifdef ODM_WT_EDIT
 #Wuzhenzhen.Wu 2019/12/17,Add for ODM_WT_EDIT maco in kernel
 KBUILD_CFLAGS   += -DODM_WT_EDIT
 KBUILD_CPPFLAGS += -DODM_WT_EDIT
 CFLAGS_KERNEL   += -DODM_WT_EDIT
 CFLAGS_MODULE   += -DODM_WT_EDIT
 export ODM_WT_EDIT=yes
+# endif /* ODM_WT_EDIT */
 
 # Read KERNELRELEASE from include/config/kernel.release (if it exists)
 KERNELRELEASE = $(shell cat include/config/kernel.release 2> /dev/null)
@@ -582,6 +587,7 @@ export KBUILD_AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 export KBUILD_AFLAGS_MODULE KBUILD_CFLAGS_MODULE KBUILD_LDFLAGS_MODULE
 export KBUILD_AFLAGS_KERNEL KBUILD_CFLAGS_KERNEL
 export KBUILD_ARFLAGS
+export TARGET_BUILD_VARIANT
 
 # When compiling out-of-tree modules, put MODVERDIR in the module
 # tree rather than in the kernel tree. The kernel tree might
