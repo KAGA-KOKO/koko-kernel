@@ -933,7 +933,7 @@ static int sm5414_charger_get_min_ichg(struct charger_device *chg_dev, u32 *uA)
 		 *done = 0;
 	 }
 	 */
-	 pr_err("[sm5414check charging done]\n");
+	 pr_debug("[sm5414check charging done]\n");
 	 if(topoff_flag == 200) {
 		*done = 1;
 		oppo_full_logo = true;
