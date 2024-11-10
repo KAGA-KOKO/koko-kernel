@@ -725,11 +725,11 @@ void mtk_charger_int_handler(void)
 {
 #ifdef VENDOR_EDIT
 /* Jianchao.Shi@BSP.CHG.Basic, 2018/11/09, sjc Add for charging */
-	chr_err("mtk_charger_int_handler\n");
+	chr_debug("mtk_charger_int_handler\n");
 	if (mt_get_charger_type() != CHARGER_UNKNOWN)
 		oppo_wake_up_usbtemp_thread();
 #else
-	chr_err("mtk_charger_int_handler\n");
+	chr_debug("mtk_charger_int_handler\n");
 
 	if (pinfo == NULL) {
 		chr_err("charger is not rdy ,skip1\n");
@@ -1548,7 +1548,7 @@ static bool oppo_mt6360_get_vbus_status(void)
 		vbus_status = false;
 	else
 		vbus_status = true;
-	pr_err("charger type = %d\n",g_oppo_chip->charger_type);
+	pr_debug("charger type = %d\n",g_oppo_chip->charger_type);
 	return vbus_status;
 #endif /*ODM_HQ_EDIT*/
 }
@@ -1566,7 +1566,7 @@ static int get_rtc_spare_oppo_fg_value(void)
 	int rtc_ui_soc;
 
 	rtc_ui_soc = (spare3_reg & 0x7f);
-	pr_err("[fgauge_get_monitic_rtc_ui_soc] rtc_ui_soc %d spare3_reg 0x%x\n",
+	pr_debug("[fgauge_get_monitic_rtc_ui_soc] rtc_ui_soc %d spare3_reg 0x%x\n",
 		rtc_ui_soc, spare3_reg);
 	return rtc_ui_soc;
 #else /*ODM_HQ_EDIT*/
@@ -1588,7 +1588,7 @@ static int set_rtc_spare_oppo_fg_value(int soc)
 	/* set spare3 0x7f */
 	set_rtc_spare_monitic_soc_value(new_spare3_reg);
 
-	pr_err("[fg_set_monitic_rtc_ui_soc] rtc_ui_soc %d spare3_reg 0x%x new_spare3_reg 0x%x\n",
+	pr_debug("[fg_set_monitic_rtc_ui_soc] rtc_ui_soc %d spare3_reg 0x%x new_spare3_reg 0x%x\n",
 		soc, spare3_reg, new_spare3_reg);
 	return 0;
 #else /*ODM_HQ_EDIT*/
