@@ -109,10 +109,7 @@ static void ccci_aed_v3(struct ccci_fsm_ee *mdee, unsigned int dump_flag,
 				}
 				logBuf[temp_i] = aed_str_for_hash[temp_i];
 			}
-			logBuf[BUF_LOG_LENGTH - 1] = '\0';
-			CCCI_NORMAL_LOG(md_id, FSM, "modem crash wirte to critical log. hashid = %u, cause = %s.", hashId, logBuf);
-			mm_keylog_write_modemdump(hashId, logBuf, MODEM_MONITOR_ID);
-			vfree(logBuf);
+			
 		}
 	#endif /*VENDOR_EDIT*/
 	/* MD ID must sync with aee_dump_ccci_debug_info() */
