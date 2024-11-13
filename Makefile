@@ -427,18 +427,6 @@ endif
 #endif /* VENDOR_EDIT */
 
 #ifdef VENDOR_EDIT
-#//Liang.Zhang@PSW.TECH.Bootup, 2018/10/19, Add for kernel monitor whole bootup
-#ifdef HANG_OPPO_ALL
-#Kun Hu@TECH.BSP.Stability.PROJECT_PHOENIX, 2019/06/08, Remove phoenix for Self Stability Test Version
-ifneq ($(SPECIAL_OPPO_CONFIG),1)
-KBUILD_CFLAGS +=   -DHANG_OPPO_ALL
-KBUILD_CPPFLAGS += -DHANG_OPPO_ALL
-CFLAGS_KERNEL +=   -DHANG_OPPO_ALL
-CFLAGS_MODULE +=   -DHANG_OPPO_ALL
-endif
-#endif /* VENDOR_EDIT */
-
-#ifdef VENDOR_EDIT
 #Bin.Yan@PSW.AD.BuildConfig.BaseConfig.1068615, 2017/08/28,Add for disallow system remount
 ifneq ($(SPECIAL_OPPO_CONFIG),1)
 ifneq ($(SPECIAL_OPPO_PERFORMANCE),1)

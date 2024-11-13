@@ -14,9 +14,9 @@ obj-$(CONFIG_OPPO_ALS_CALI)   +=  oppo_als_cali_value/
 #ifdef VENDOR_EDIT
 #//Kun.Hu@PSW.TECH 2018/11/15, Add phoenix base
 #Kun Hu@TECH.BSP.Stability.PROJECT_PHOENIX, 2019/06/08, Remove phoenix for Self Stability Test Version
-ifneq ($(SPECIAL_OPPO_CONFIG),1)
-obj-y     +=  oppo_phoenix/
-endif
+#ifneq ($(SPECIAL_OPPO_CONFIG),1)
+#obj-y     +=  oppo_phoenix/
+#endif
 #endif /* VENDOR_EDIT */
 
 #ifdef VENDOR_EDIT
