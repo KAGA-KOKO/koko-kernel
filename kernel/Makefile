@@ -54,6 +54,7 @@ obj-y += livepatch/
 #ifdef VENDOR_EDIT
 #Liujie.Xie@TECH.Kernel.Sched, 2019/05/22, add for ui first
 obj-y += oppocfs/
+#endif /* VENDOR_EDIT */
 
 obj-$(CONFIG_CHECKPOINT_RESTORE) += kcmp.o
 obj-$(CONFIG_FREEZER) += freezer.o
@@ -147,3 +148,4 @@ $(obj)/config_data.h: $(obj)/config_data.gz FORCE
 #Liang.Zhang@PSW.TECH.BOOTUP, 2018/11/16, Add for panic recovery
 #ifdef HANG_OPPO_ALL
 obj-$(CONFIG_HANG_OPPO_ALL) += op_panic_recovery.o
+#endif /* VENDOR_EDIT */
