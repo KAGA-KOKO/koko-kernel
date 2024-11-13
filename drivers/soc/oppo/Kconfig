@@ -32,5 +32,5 @@ source "drivers/soc/oppo/oppo_als_cali_value/Kconfig"
 
 #ifdef VENDOR_EDIT
 #* wen.luo@PSW.BSP.kernel, 2019/6/25, Add for parsar powoff/powon */
-source "drivers/soc/oppo/oppo_lastpmic/Kconfig"
+#source "drivers/soc/oppo/oppo_lastpmic/Kconfig"
 #endif /* VENDOR_EDIT */

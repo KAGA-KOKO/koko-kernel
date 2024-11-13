@@ -21,5 +21,5 @@ endif
 
 #ifdef VENDOR_EDIT
 #* wen.luo@PSW.BSP.kernel, 2019/6/25, Add for parsar powoff/powon */
-obj-y     +=  oppo_lastpmic/
+#obj-y     +=  oppo_lastpmic/
 #endif /* VENDOR_EDIT */
