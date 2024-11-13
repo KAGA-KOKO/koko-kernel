@@ -20,6 +20,7 @@
  * Bill Yu    2018/6/5    0.1.3      Support chip enter power down
  * Bill Yu    2018/6/7    0.1.4      Support create proc node
  * Bill Yu    2018/6/27   0.1.5      Expand pwdn I/F
+ * Rui Wu     2019/10/10  0.1.6      Support create class node
  *
  */
 
@@ -175,11 +176,13 @@ struct fp_dev_touch_info {
 
 #define RESET_TIME            2	/* Default chip reset wait time(ms) */
 #define RESET_TIME_MULTIPLE   1 /* Multiple for reset time multiple*wait_time */
-#define SIFP_NETLINK_ROUTE    30
+#define SIFP_NETLINK_ROUTE    0 //30
 #define NL_MSG_LEN            16
 
 //#define PROC_DIR		"fp"      /* if defined, create node under /proc/fp/xxx */
 //#define PROC_NODE		"fp_id"   /* proc node name */
+
+//#define CLASS_NODE   "fingerprint"   /* if defined, create class node /sys/class/fingerprint/fingerprint */
 
 #if (SIFP_NETLINK_ROUTE > 0)
     #define BSP_SIL_NETLINK
@@ -190,8 +193,8 @@ struct fp_dev_touch_info {
 #endif /* ! BSP_SIL_PLAT_MTK & ! BSP_SIL_PLAT_QCOM */
 
 /* Todo: enable correct power supply mode */
-#define BSP_SIL_POWER_SUPPLY_REGULATOR
-//#define BSP_SIL_POWER_SUPPLY_PINCTRL
+//#define BSP_SIL_POWER_SUPPLY_REGULATOR
+#define BSP_SIL_POWER_SUPPLY_PINCTRL
 //#define BSP_SIL_POWER_SUPPLY_GPIO
 
 /* AVDD voltage range 2.8v ~ 3.3v */
@@ -213,7 +216,7 @@ struct fp_dev_touch_info {
   #define DEVICE "/dev/spidev1.0"
   //#define BSP_SIL_IRQ_CONFIRM
   #define PKG_SIZE 1
- // #define BSP_SIL_DYNAMIC_SPI
+  //#define BSP_SIL_DYNAMIC_SPI
  #ifndef CONFIG_SILEAD_FP_PLATFORM
   //#define BSP_SIL_CTRL_SPI
  #endif /* !CONFIG_SILEAD_FP_PLATFORM */

@@ -60,9 +60,9 @@ struct navi_cmd_struct cmd_list;
 #else
 #define ENABLE_SWIPE_LEFT_RIGHT	DISABLE
 #endif
-#define ENABLE_FINGER_DOWN_UP	ENABLE //DISABLE
-#define KEY_FPS_DOWN   210 //614
-#define KEY_FPS_UP     210 //615
+#define ENABLE_FINGER_DOWN_UP	ENABLE
+#define KEY_FPS_DOWN   210
+#define KEY_FPS_UP     615
 #define KEY_FPS_TAP    616
 #define KEY_FPS_HOLD   617
 #define KEY_FPS_YPLUS  618
@@ -148,7 +148,7 @@ static unsigned int prev_keycode;
  * @ ENABLE_TRANSLATED_LONG_TOUCH
  *     ENABLE/DISABLE : enable/disable long-touch event.
  */
-#define ENABLE_TRANSLATED_SINGLE_CLICK	DISABLE
+#define ENABLE_TRANSLATED_SINGLE_CLICK	ENABLE
 #define ENABLE_TRANSLATED_DOUBLE_CLICK	DISABLE
 #define ENABLE_TRANSLATED_LONG_TOUCH	DISABLE
 
@@ -192,9 +192,9 @@ static unsigned int prev_keycode;
 #define	KEYEVENT_LONGTOUCH_ACTION   KEY_PRESS_RELEASE
 
 #define	KEYEVENT_ON                 KEY_FPS_DOWN
-#define	KEYEVENT_ON_ACTION          KEY_PRESS  //KEY_PRESS_RELEASE
+#define	KEYEVENT_ON_ACTION          KEY_PRESS_RELEASE
 #define	KEYEVENT_OFF                KEY_FPS_UP
-#define	KEYEVENT_OFF_ACTION         KEY_RELEASE  //KEY_PRESS_RELEASE
+#define	KEYEVENT_OFF_ACTION         KEY_PRESS_RELEASE
 
 
 /*---------------End of TRANSLATED properties-----------------*/
@@ -238,12 +238,12 @@ static unsigned int prev_keycode;
  *   KEY_RELEASE : Release key button
  *   KEY_PRESS_RELEASE : Combined action of press-then-release
  */
-#define	KEYEVENT_CANCEL			KEY_0
+//#define	KEYEVENT_CANCEL			KEY_0
 #define	KEYEVENT_CANCEL_ACTION	KEY_PRESS_RELEASE
-#define	KEYEVENT_ON				KEY_EXIT
-#define	KEYEVENT_ON_ACTION		KEY_PRESS
-#define	KEYEVENT_OFF			KEY_EXIT
-#define	KEYEVENT_OFF_ACTION		KEY_RELEASE
+//#define	KEYEVENT_ON				KEY_EXIT
+//#define	KEYEVENT_ON_ACTION		KEY_PRESS
+//#define	KEYEVENT_OFF			KEY_EXIT
+//#define	KEYEVENT_OFF_ACTION		KEY_RELEASE
 
 /*-----------------End of STRAIGHT properties-------------------*/
 
@@ -299,7 +299,6 @@ void init_event_enable(struct egistec_data *egistec)
 {
 	set_bit(EV_KEY, egistec->input_dev->evbit);
 	set_bit(EV_SYN, egistec->input_dev->evbit);
-	set_bit(210, egistec->input_dev->keybit);
 #if TRANSLATED_COMMAND
 	set_bit(KEYEVENT_ON, egistec->input_dev->keybit);
 	set_bit(KEYEVENT_OFF, egistec->input_dev->keybit);
@@ -388,6 +387,7 @@ void translated_command_converter(char cmd, struct egistec_data *egistec)
 		break;
 
 	case NAVI_EVENT_OFF: /* finger up */
+#if 0
 		if (g_KeyEventRaised == false) {
 			g_KeyEventRaised = true;
 			pr_info("Egis : g_SingleClick %u tap interval =%u double tap interval = %u time= %u",
@@ -396,7 +396,7 @@ void translated_command_converter(char cmd, struct egistec_data *egistec)
 #if ENABLE_TRANSLATED_SINGLE_CLICK
 			if ((jiffies - g_SingleClickJiffies) < (HZ * SINGLECLICK_INTERVAL / 1000)) {
 				/* Click event */
-				send_key_event(egistec, KEYEVENT_CLICK, KEYEVENT_CLICK_ACTION);
+				//send_key_event(egistec, KEYEVENT_CLICK, KEYEVENT_CLICK_ACTION);
 				g_SingleClick++;
 				if (g_SingleClick == 1) {
 					g_DoubleClickJiffies = jiffies;
@@ -407,7 +407,7 @@ void translated_command_converter(char cmd, struct egistec_data *egistec)
 			if (g_SingleClick >= 2) {
 				if ((jiffies - g_DoubleClickJiffies) < (HZ * (SINGLECLICK_INTERVAL+DOUBLECLICK_INTERVAL) / 1000)) {
 					/* Double click event */
-					send_key_event(egistec, KEYEVENT_DOUBLECLICK, KEYEVENT_DOUBLECLICK_ACTION);
+					//send_key_event(egistec, KEYEVENT_DOUBLECLICK, KEYEVENT_DOUBLECLICK_ACTION);
 					g_SingleClick = 0;
 				} else {
 					g_SingleClick = 1;
@@ -418,20 +418,21 @@ void translated_command_converter(char cmd, struct egistec_data *egistec)
 #endif
 
 #if ENABLE_FINGER_DOWN_UP
-			send_key_event(egistec, KEYEVENT_OFF, KEYEVENT_OFF_ACTION);
+			//send_key_event(egistec, KEYEVENT_OFF, KEYEVENT_OFF_ACTION);
 #endif
 		}
 #if ENABLE_FINGER_DOWN_UP
 		else	{
 			if (prev_keycode == KEYEVENT_LONGTOUCH)
-				send_key_event(egistec, KEYEVENT_OFF, KEYEVENT_OFF_ACTION);
+				//send_key_event(egistec, KEYEVENT_OFF, KEYEVENT_OFF_ACTION);
+				;
 		}
+#endif
 #endif
 #if ENABLE_TRANSLATED_LONG_TOUCH
 		del_timer(&long_touch_timer);
 #endif
 		break;
-
 	case NAVI_EVENT_UP:
 		if (g_KeyEventRaised == false) {
 			g_KeyEventRaised = true;
@@ -518,7 +519,7 @@ void straight_command_converter(char cmd, struct egistec_data *egistec)
 		break;
 
 	case NAVI_EVENT_UP:
-        send_key_event(egistec, 210, KEYEVENT_UP_ACTION);
+
 #if ENABLE_SWIPE_UP_DOWN
 		send_key_event(egistec, KEYEVENT_UP, KEYEVENT_UP_ACTION);
 #endif
@@ -526,7 +527,6 @@ void straight_command_converter(char cmd, struct egistec_data *egistec)
 		break;
 
 	case NAVI_EVENT_DOWN:
-	    send_key_event(egistec, 210, KEYEVENT_DOWN_ACTION);
 
 #if ENABLE_SWIPE_UP_DOWN
 		send_key_event(egistec, KEYEVENT_DOWN, KEYEVENT_DOWN_ACTION);

@@ -32,7 +32,7 @@
 #define DEBUG_PRINT(fmt, args...)
 #endif
 
-#define ET520_MAJOR				100 /* assigned */
+#define ET512_MAJOR				100 /* assigned */
 #define N_SPI_MINORS				32  /* ... up to 256 */
 
 #define FP_ADDRESS_0				0x00
@@ -76,16 +76,12 @@
 #define FP_SPICLK_ENABLE			0xaa
 #define FP_SPICLK_DISABLE			0xab
 #define DELETE_DEVICE_NODE			0xac
-/* Get Power Supply */
-#define FP_POWERSETUP 				0xb0
-/* enable/disable Wakelock when SDK work*/
-#define FP_WAKELOCK_ENABLE 		0xb1
-#define FP_WAKELOCK_DISABLE 		0xb2
-/* notifier LCD status*/
-#define GET_SCREEN_ONOFF 			0xb3
 
 #define DRDY_IRQ_ENABLE				1
 #define DRDY_IRQ_DISABLE			0
+
+#define FP_WAKELOCK_TIMEOUT_ENABLE  0xb1
+#define FP_WAKELOCK_TIMEOUT_DISABLE 0xb2
 
 /* interrupt polling */
 unsigned int fps_interrupt_poll(
@@ -129,10 +125,9 @@ struct egis_ioc_transfer {
 struct egistec_data {
 	dev_t devt;
 	spinlock_t spi_lock;
-	struct spi_device  *spi;
+	struct spi_device  *spi;	
 	struct platform_device *pd;
 	struct list_head device_entry;
-	struct notifier_block notifier;
 
 	/* buffer is NULL unless this device is open (users > 0) */
 	struct mutex buf_lock;
@@ -152,7 +147,7 @@ struct egistec_data {
 	struct pinctrl *pinctrl_gpios;
 	struct pinctrl_state *pins_irq;
 	struct pinctrl_state *pins_miso_spi, *pins_miso_pullhigh, *pins_miso_pulllow;
-	struct pinctrl_state *pins_reset_high, *pins_reset_low;
+	struct pinctrl_state *pins_reset_high, *pins_reset_low,*pins_power_high,*pins_power_low;
 #endif	
 	
 	
