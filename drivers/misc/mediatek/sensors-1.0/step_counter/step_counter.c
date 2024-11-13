@@ -18,11 +18,7 @@
 static struct step_c_context *step_c_context_obj;
 static struct step_c_init_info *
 	step_counter_init_list[MAX_CHOOSE_STEP_C_NUM] = { 0 };
-#ifdef VENDOR_EDIT
-//zhye@PSW.BSP.Sensor, 2018-01-20, to store original STEP and upload
-static unsigned int step_first_data = 0;
-static uint32_t last_step_counter = 0;
-#endif
+
 static void step_c_work_func(struct work_struct *work)
 {
 
@@ -127,16 +123,12 @@ static struct step_c_context *step_c_context_alloc_object(void)
 {
 	struct step_c_context *obj = kzalloc(sizeof(*obj), GFP_KERNEL);
 
-	pr_debug("step_c_context_alloc_object++++\n");
+	pr_debug("%s start\n", __func__);
 	if (!obj) {
 		pr_err("Alloc step_c object error!\n");
 		return NULL;
 	}
-#ifndef VENDOR_EDIT
 	atomic_set(&obj->delay, 2000);	/*0.5Hz */
-#else
-	atomic_set(&obj->delay, 200); //5Hz
-#endif
 	atomic_set(&obj->wake, 0);
 	INIT_WORK(&obj->report, step_c_work_func);
 	init_timer(&obj->timer);
@@ -149,11 +141,11 @@ static struct step_c_context *step_c_context_alloc_object(void)
 	obj->is_step_c_batch_enable = false;	/* for batch mode init */
 	obj->is_step_d_batch_enable = false;	/* for batch mode init */
 
-	pr_debug("step_c_context_alloc_object----\n");
+	pr_debug("%s end\n", __func__);
 	return obj;
 }
 
-int step_notify(STEP_NOTIFY_TYPE type)
+int step_notify_t(enum STEP_NOTIFY_TYPE type, int64_t time_stamp)
 {
 	int err = 0;
 	struct step_c_context *cxt = NULL;
@@ -162,6 +154,7 @@ int step_notify(STEP_NOTIFY_TYPE type)
 	memset(&event, 0, sizeof(struct sensor_event));
 
 	cxt = step_c_context_obj;
+	event.time_stamp = time_stamp;
 
 	if (type == TYPE_STEP_DETECTOR) {
 		event.flush_action = DATA_ACTION;
@@ -183,7 +176,10 @@ int step_notify(STEP_NOTIFY_TYPE type)
 
 	return err;
 }
-
+int step_notify(enum STEP_NOTIFY_TYPE type)
+{
+	return step_notify_t(type, 0);
+}
 static int step_d_real_enable(int enable)
 {
 	int err = 0;
@@ -347,11 +343,6 @@ static int step_c_enable_data(int enable)
 				cxt->is_polling_run = true;
 			}
 		}
-#ifdef VENDOR_EDIT
-//zhye@PSW.BSP.Sensor, 2018-01-20, to store original STEP and upload
-		step_first_data = 1;
-		step_c_data_report(last_step_counter, 3);
-#endif
 	}
 	if (enable == 0) {
 		pr_debug("STEP_C disable\n");
@@ -418,19 +409,13 @@ int step_c_enable_nodata(int enable)
 
 	cxt = step_c_context_obj;
 	if (cxt->step_c_ctl.enable_nodata == NULL) {
-		pr_err("step_c_enable_nodata:step_c ctl path is NULL\n");
+		pr_err("%s:step_c ctl path is NULL\n", __func__);
 		return -1;
 	}
 
 	if (enable == 1)
-	{
 		cxt->is_active_nodata = true;
-#ifdef VENDOR_EDIT
-//zhye@PSW.BSP.Sensor, 2018-01-20, to store original STEP and upload
-		step_first_data = 1;
-		step_c_data_report(last_step_counter, 3);
-#endif
-	}
+
 	if (enable == 0)
 		cxt->is_active_nodata = false;
 	step_c_real_enable(enable);
@@ -479,7 +464,7 @@ static ssize_t step_c_store_active(struct device *dev,
 	int handle = 0;
 	int en = 0;
 
-	pr_debug("step_c_store_active buf=%s\n", buf);
+	pr_debug("%s buf=%s\n", __func__, buf);
 	mutex_lock(&step_c_context_obj->step_c_op_mutex);
 
 	cxt = step_c_context_obj;
@@ -490,8 +475,8 @@ static ssize_t step_c_store_active(struct device *dev,
 	}
 	res = sscanf(buf, "%d,%d", &handle, &en);
 	if (res != 2)
-		pr_debug(" step_store_active param error: res = %d\n", res);
-	pr_debug(" step_store_active handle=%d ,en=%d\n", handle, en);
+		pr_debug("%s param error: res = %d\n", __func__, res);
+	pr_debug("%s handle=%d ,en=%d\n", __func__, handle, en);
 	switch (handle) {
 	case ID_STEP_COUNTER:
 		if (en == 1)
@@ -499,7 +484,7 @@ static ssize_t step_c_store_active(struct device *dev,
 		else if (en == 0)
 			res = step_c_enable_data(0);
 		else
-			pr_err(" step_c_store_active error !!\n");
+			pr_err("%s error !!\n", __func__);
 		break;
 	case ID_STEP_DETECTOR:
 		if (en == 1)
@@ -528,7 +513,7 @@ static ssize_t step_c_store_active(struct device *dev,
 
 	}
 	mutex_unlock(&step_c_context_obj->step_c_op_mutex);
-	pr_debug(" step_c_store_active done\n");
+	pr_debug("%s done\n", __func__);
 	return res;
 }
 
@@ -597,7 +582,7 @@ static ssize_t step_c_store_batch(struct device *dev,
 	res = sscanf(buf, "%d,%d,%lld,%lld",
 		&handle, &flag, &samplingPeriodNs, &maxBatchReportLatencyNs);
 	if (res != 4)
-		pr_err("step_c_store_batch param error: err =%d\n", res);
+		pr_err("%s param error: err =%d\n", __func__, res);
 	pr_debug("handle %d, flag:%d PeriodNs:%lld, LatencyNs: %lld\n",
 		handle, flag, samplingPeriodNs, maxBatchReportLatencyNs);
 	mutex_lock(&step_c_context_obj->step_c_op_mutex);
@@ -648,8 +633,7 @@ static ssize_t step_c_store_batch(struct device *dev,
 			pr_err("floor count enable batch err %d\n", res);
 	}
 	mutex_unlock(&step_c_context_obj->step_c_op_mutex);
-	pr_debug(" step_c_store_batch done: %d\n",
-		cxt->is_step_c_batch_enable);
+	pr_debug("%s done: %d\n", __func__, cxt->is_step_c_batch_enable);
 	return res;
 }
 
@@ -668,10 +652,9 @@ static ssize_t step_c_store_flush(struct device *dev,
 
 	err = kstrtoint(buf, 10, &handle);
 	if (err != 0)
-		pr_err("step_c_store_flush param error: err = %d\n",
-			err);
+		pr_err("%s param error: err = %d\n", __func__, err);
 
-	pr_debug("step_c_store_flush param: handle %d\n", handle);
+	pr_debug("%s param: handle %d\n", __func__, handle);
 
 	mutex_lock(&step_c_context_obj->step_c_op_mutex);
 	cxt = step_c_context_obj;
@@ -726,13 +709,13 @@ static ssize_t step_c_show_devnum(struct device *dev,
 
 static int step_counter_remove(struct platform_device *pdev)
 {
-	pr_debug("step_counter_remove\n");
+	pr_debug("%s\n", __func__);
 	return 0;
 }
 
 static int step_counter_probe(struct platform_device *pdev)
 {
-	pr_debug("step_counter_probe\n");
+	pr_debug("%s\n", __func__);
 	return 0;
 }
 
@@ -760,7 +743,7 @@ static int step_c_real_driver_init(void)
 	int i = 0;
 	int err = 0;
 
-	pr_debug(" step_c_real_driver_init +\n");
+	pr_debug("%s start\n", __func__);
 	for (i = 0; i < MAX_CHOOSE_STEP_C_NUM; i++) {
 		pr_debug(" i=%d\n", i);
 		if (step_counter_init_list[i] != 0) {
@@ -776,7 +759,7 @@ static int step_c_real_driver_init(void)
 	}
 
 	if (i == MAX_CHOOSE_STEP_C_NUM) {
-		pr_debug(" step_c_real_driver_init fail\n");
+		pr_debug("%s fail\n", __func__);
 		err = -1;
 	}
 	return err;
@@ -954,54 +937,53 @@ int step_c_register_control_path(struct step_c_control_path *ctl)
 	return 0;
 }
 
-int step_c_data_report(uint32_t new_counter, int status)
+int step_c_data_report_t(uint32_t new_counter, int status, int64_t time_stamp)
 {
 	int err = 0;
 	struct sensor_event event;
 	static uint32_t last_step_counter;
 
 	memset(&event, 0, sizeof(struct sensor_event));
-#ifdef VENDOR_EDIT
-//zhye@PSW.BSP.Sensor, 2018-01-20, to store original STEP and upload
-	if ((new_counter > last_step_counter) || (step_first_data == 1)) {
-		if (step_first_data == 1)
-		{
-			new_counter = last_step_counter;
-			step_first_data = 0;
-		}
-		pr_err("step_counter=%d\n",new_counter);
-#else//VENDOR_EDIT
+	event.time_stamp = time_stamp;
 	if (last_step_counter != new_counter) {
-#endif//VENDOR_EDIT
 		event.flush_action = DATA_ACTION;
 		event.handle = ID_STEP_COUNTER;
 		event.word[0] = new_counter;
-		last_step_counter = new_counter;
 		err = sensor_input_event(step_c_context_obj->mdev.minor,
 			&event);
+		if (err >= 0)
+			last_step_counter = new_counter;
 	}
-	return 0;
+	return err;
+}
+int step_c_data_report(uint32_t new_counter, int status)
+{
+	return step_c_data_report_t(new_counter, status, 0);
 }
 
-int floor_c_data_report(uint32_t new_counter, int status)
+int floor_c_data_report_t(uint32_t new_counter, int status, int64_t time_stamp)
 {
 	int err = 0;
 	struct sensor_event event;
 	static uint32_t last_floor_counter;
 
 	memset(&event, 0, sizeof(struct sensor_event));
-
+	event.time_stamp = time_stamp;
 	if (last_floor_counter != new_counter) {
 		event.flush_action = DATA_ACTION;
 		event.handle = ID_FLOOR_COUNTER;
 		event.word[0] = new_counter;
-		last_floor_counter = new_counter;
 		err = sensor_input_event(step_c_context_obj->mdev.minor,
 			&event);
+		if (err >= 0)
+			last_floor_counter = new_counter;
 	}
-	return 0;
+	return err;
 }
-
+int floor_c_data_report(uint32_t new_counter, int status)
+{
+	return floor_c_data_report_t(new_counter, status, 0);
+}
 int step_c_flush_report(void)
 {
 	struct sensor_event event;
@@ -1054,7 +1036,7 @@ static int step_c_probe(void)
 
 	int err;
 
-	pr_debug("+++++++++++++step_c_probe!!\n");
+	pr_debug("%s+++!!\n", __func__);
 
 	step_c_context_obj = step_c_context_alloc_object();
 	if (!step_c_context_obj) {
@@ -1070,16 +1052,14 @@ static int step_c_probe(void)
 		goto real_driver_init_fail;
 	}
 
-	pr_debug("----step_c_probe OK !!\n");
+	pr_debug("%s---- OK !!\n", __func__);
 	return 0;
 real_driver_init_fail:
 	kfree(step_c_context_obj);
 exit_alloc_data_failed:
-	pr_debug("----step_c_probe fail !!!\n");
+	pr_debug("%s---- fail !!!\n", __func__);
 	return err;
 }
-
-
 
 static int step_c_remove(void)
 {

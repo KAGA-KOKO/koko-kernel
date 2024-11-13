@@ -96,7 +96,7 @@ static int barohub_get_pressure(char *buf, int bufsize)
 
 	return err;
 }
-static ssize_t show_sensordata_value(struct device_driver *ddri, char *buf)
+static ssize_t sensordata_show(struct device_driver *ddri, char *buf)
 {
 	char strbuf[BAROHUB_BUFSIZE] = {0};
 	int err = 0;
@@ -111,10 +111,9 @@ static ssize_t show_sensordata_value(struct device_driver *ddri, char *buf)
 		pr_err("barohub_set_powermode fail!!\n");
 		return 0;
 	}
-
 	return snprintf(buf, PAGE_SIZE, "%s\n", strbuf);
 }
-static ssize_t show_trace_value(struct device_driver *ddri, char *buf)
+static ssize_t trace_show(struct device_driver *ddri, char *buf)
 {
 	ssize_t res = 0;
 	struct barohub_ipi_data *obj = obj_ipi_data;
@@ -128,7 +127,7 @@ static ssize_t show_trace_value(struct device_driver *ddri, char *buf)
 	return res;
 }
 
-static ssize_t store_trace_value(struct device_driver *ddri,
+static ssize_t trace_store(struct device_driver *ddri,
 			const char *buf, size_t count)
 {
 	struct barohub_ipi_data *obj = obj_ipi_data;
@@ -153,8 +152,8 @@ static ssize_t store_trace_value(struct device_driver *ddri,
 	}
 	return count;
 }
-static DRIVER_ATTR(sensordata, 0444, show_sensordata_value, NULL);
-static DRIVER_ATTR(trace, 0644, show_trace_value, store_trace_value);
+static DRIVER_ATTR_RO(sensordata);
+static DRIVER_ATTR_RW(trace);
 
 static struct driver_attribute *barohub_attr_list[] = {
 	&driver_attr_sensordata,	/* dump sensor data */
@@ -199,12 +198,10 @@ static int baro_recv_data(struct data_unit_t *event, void *reserved)
 	int err = 0;
 	struct barohub_ipi_data *obj = obj_ipi_data;
 
-	if (READ_ONCE(obj->android_enable) == false)
-		return 0;
-
 	if (event->flush_action == FLUSH_ACTION)
 		err = baro_flush_report();
-	else if (event->flush_action == DATA_ACTION)
+	else if (event->flush_action == DATA_ACTION &&
+			READ_ONCE(obj->android_enable) == true)
 		err = baro_data_report(event->pressure_t.pressure, 2,
 			(int64_t)event->time_stamp);
 	return err;
@@ -451,7 +448,7 @@ static int barohub_probe(struct platform_device *pdev)
 	ctl.is_support_batch = false;
 #elif defined CONFIG_NANOHUB
 	ctl.is_report_input_direct = true;
-	ctl.is_support_batch = false;
+	ctl.is_support_batch = true;
 #else
 #endif
 	err = baro_register_control_path(&ctl);

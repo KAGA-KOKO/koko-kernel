@@ -178,7 +178,7 @@ int mag_factory_device_register(struct mag_factory_public *dev)
 	mag_factory.fops = dev->fops;
 	err = misc_register(&mag_factory_device);
 	if (err) {
-		pr_err("mag_factory_device_register register failed\n");
+		pr_err("%s register failed\n", __func__);
 		err = -1;
 	}
 	return err;

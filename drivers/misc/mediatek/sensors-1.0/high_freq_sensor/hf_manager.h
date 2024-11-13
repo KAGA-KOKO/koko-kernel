@@ -17,7 +17,6 @@
 #include <linux/hrtimer.h>
 #include <linux/interrupt.h>
 #include <linux/kthread.h>
-#include <linux/sched.h>
 #include <linux/ioctl.h>
 #include <linux/types.h>
 
@@ -113,6 +112,7 @@ struct hf_client_fifo {
 	unsigned int tail;
 	unsigned int bufsize;
 	unsigned int buffull;
+	int64_t last_time_stamp[HIGH_FREQUENCY_SENSOR_MAX];
 	struct hf_manager_event *buffer;
 	wait_queue_head_t wait;
 };

@@ -1517,7 +1517,7 @@ static int bmi160_gyro_get_data(int *x, int *y, int *z, int *status)
 		return err;
 
 	if (sscanf(buff, "%x %x %x", x, y, z) != 3)
-		pr_err_ratelimited("bmi160_gyro_get_data failed");
+		pr_err_ratelimited("%s failed\n", __func__);
 	*status = SENSOR_STATUS_ACCURACY_MEDIUM;
 	return 0;
 }
@@ -1567,7 +1567,7 @@ static int bmg_factory_get_data(int32_t data[3], int *status)
 }
 static int bmg_factory_get_raw_data(int32_t data[3])
 {
-	pr_debug("don't support bmg_factory_get_raw_data!\n");
+	pr_debug("%s don't support!\n", __func__);
 	return 0;
 }
 static int bmg_factory_enable_calibration(void)

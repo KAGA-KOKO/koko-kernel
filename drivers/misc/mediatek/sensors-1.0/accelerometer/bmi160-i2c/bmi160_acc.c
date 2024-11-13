@@ -928,7 +928,7 @@ static int BMI160_ACC_ReadRawData(struct i2c_client *client, char *buf)
 		pr_err_ratelimited("read acc raw data failed.\n");
 		return -EIO;
 	}
-	sprintf(buf, "BMI160_ACC_ReadRawData %04x %04x %04x",
+	sprintf(buf, "%s %04x %04x %04x", __func__,
 		databuf[BMI160_ACC_AXIS_X], databuf[BMI160_ACC_AXIS_Y],
 		databuf[BMI160_ACC_AXIS_Z]);
 
@@ -1055,7 +1055,7 @@ static ssize_t store_acc_op_mode_value(struct device_driver *ddri,
 	err = kstrtoul(buf, 10, &data);
 	if (err)
 		return err;
-	pr_debug("store_acc_op_mode_value = %d .\n", (int)data);
+	pr_debug("%s = %d .\n", __func__, (int)data);
 	if (data == BMI160_ACC_MODE_NORMAL)
 		err = BMI160_ACC_SetPowerMode(bmi160_acc_i2c_client, true);
 	else
@@ -2141,7 +2141,7 @@ static int bmi160_acc_enable_nodata(int en)
 		pr_err_ratelimited("BMI160_ACC_SetPowerMode failed.\n");
 		return -1;
 	}
-	pr_debug("bmi160_acc_enable_nodata ok!\n");
+	pr_debug("%s ok!\n", __func__);
 	return err;
 }
 
@@ -2221,12 +2221,12 @@ static int bmi160_acc_get_data(int *x, int *y, int *z, int *status)
 	err = BMI160_ACC_ReadSensorData(obj_i2c_data->client, buff,
 					BMI160_BUFSIZE);
 	if (err < 0) {
-		pr_err_ratelimited("bmi160_acc_get_data failed.\n");
+		pr_err_ratelimited("%s failed.\n", __func__);
 		return err;
 	}
 	err = sscanf(buff, "%x %x %x", x, y, z);
 	if (err < 0) {
-		pr_err_ratelimited("bmi160_acc_get_data failed.\n");
+		pr_err_ratelimited("%s failed.\n", __func__);
 		return err;
 	}
 	*status = SENSOR_STATUS_ACCURACY_MEDIUM;
@@ -2259,7 +2259,7 @@ static int bmi160_factory_get_raw_data(int32_t data[3])
 	char strbuf[BMI160_BUFSIZE] = {0};
 
 	BMI160_ACC_ReadRawData(bmi160_acc_i2c_client, strbuf);
-	pr_debug("don't support bmi160_factory_get_raw_data!\n");
+	pr_debug("%s don't support!\n", __func__);
 	return 0;
 }
 static int bmi160_factory_enable_calibration(void)

@@ -29,14 +29,9 @@
 #define ALSPS_ERR_IDENTIFICATION			-6
 
 /*----------------------------------------------------------------------------*/
-typedef enum {
+enum ALSPS_NOTIFY_TYPE {
 	ALSPS_NOTIFY_PROXIMITY_CHANGE = 0,
-} ALSPS_NOTIFY_TYPE;
-
-#ifdef ODM_HQ_EDIT
-/* Yuzhe.Peng@ODM_HQ.BSP.Sensors.Config, 2019/10/15, add sensor devinfo to proc/devinfo */
-extern void hq_register_sensor_info(int sensor_type, char ic_name[]);
-#endif
+};
 
 #endif
 

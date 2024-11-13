@@ -30,14 +30,20 @@ static DEFINE_MUTEX(mpu6050_i2c_mutex);
 #define MPU6050_AXIS_Z          2
 #define MPU6050_AXES_NUM        3
 #define MPU6050_DATA_LEN        6
-#define MPU6050_DEV_NAME        "MPU6050G"	/* name must different with gyro mpu6050 */
+/* name must different with gyro mpu6050 */
+#define MPU6050_DEV_NAME        "MPU6050G"
 /*----------------------------------------------------------------------------*/
-static const struct i2c_device_id mpu6050_i2c_id[] = { {MPU6050_DEV_NAME, 0}, {} };
+static const struct i2c_device_id mpu6050_i2c_id[] = {
+	{MPU6050_DEV_NAME, 0},
+	{}
+};
 
 /*----------------------------------------------------------------------------*/
-static int mpu6050_i2c_probe(struct i2c_client *client, const struct i2c_device_id *id);
+static int mpu6050_i2c_probe(struct i2c_client *client,
+	const struct i2c_device_id *id);
 static int mpu6050_i2c_remove(struct i2c_client *client);
-static int mpu6050_i2c_detect(struct i2c_client *client, struct i2c_board_info *info);
+static int mpu6050_i2c_detect(struct i2c_client *client,
+	struct i2c_board_info *info);
 #ifdef CONFIG_PM_SLEEP
 static int mpu6050_suspend(struct device *dev);
 static int mpu6050_resume(struct device *dev);
@@ -149,7 +155,8 @@ static char selftestRes[8] = { 0 };
 #define MPU6050G_DEBUG 0
 #define GSE_TAG                  "[Gsensor] "
 #define GSE_FUN(f)               pr_debug(GSE_TAG"%s\n", __func__)
-#define GSE_ERR(fmt, args...)    pr_debug(GSE_TAG"%s %d : "fmt, __func__, __LINE__, ##args)
+#define GSE_ERR(fmt, args...)    pr_debug(GSE_TAG"%s %d : "fmt, \
+__func__, __LINE__, ##args)
 #if MPU6050G_DEBUG
 #define GSE_LOG(fmt, args...)    pr_debug(GSE_TAG fmt, ##args)
 #else
@@ -168,8 +175,6 @@ static struct data_resolution mpu6050_offset_resolution = { {0, 5}, 2048 };
 
 static unsigned int power_on;
 
-
-
 int MPU6050_gse_power(void)
 {
 	return power_on;
@@ -184,7 +189,8 @@ EXPORT_SYMBOL(MPU6050_gse_mode);
 
 
 /*----------------------------------------------------------------------------*/
-static int mpu_i2c_read_block(struct i2c_client *client, u8 addr, u8 *data, u8 len)
+static int mpu_i2c_read_block(struct i2c_client *client, u8 addr,
+	u8 *data, u8 len)
 {
 	int err;
 	u8 beg = addr;
@@ -224,8 +230,10 @@ static int mpu_i2c_read_block(struct i2c_client *client, u8 addr, u8 *data, u8 l
 
 }
 
-static int mpu_i2c_write_block(struct i2c_client *client, u8 addr, u8 *data, u8 len)
-{   /*because address also occupies one byte, the maximum length for write is 7 bytes*/
+static int mpu_i2c_write_block(struct i2c_client *client, u8 addr,
+	u8 *data, u8 len)
+{
+	/* address also occupies one byte, the max length for write is 7 bytes*/
 	int err, idx, num;
 	char buf[C_I2C_FIFO_SIZE];
 
@@ -339,7 +347,8 @@ static int MPU6050_SetDataResolution(struct mpu6050_i2c_data *obj)
 }
 
 /*----------------------------------------------------------------------------*/
-static int MPU6050_ReadData(struct i2c_client *client, s16 data[MPU6050_AXES_NUM])
+static int MPU6050_ReadData(struct i2c_client *client,
+	s16 data[MPU6050_AXES_NUM])
 {
 	struct mpu6050_i2c_data *priv = i2c_get_clientdata(client);
 	u8 buf[MPU6050_DATA_LEN] = { 0 };
@@ -348,7 +357,6 @@ static int MPU6050_ReadData(struct i2c_client *client, s16 data[MPU6050_AXES_NUM
 
 	if (client == NULL)
 		return -EINVAL;
-
 
 	/* write then burst read */
 	mpu_i2c_read_block(client, MPU6050_REG_DATAX0, buf, MPU6050_DATA_LEN);
@@ -361,54 +369,87 @@ static int MPU6050_ReadData(struct i2c_client *client, s16 data[MPU6050_AXES_NUM
 				      (buf[MPU6050_AXIS_Z * 2 + 1]));
 
 	if (atomic_read(&priv->trace) & MPU6050_TRC_RAWDATA) {
-		GSE_LOG("[%08X %08X %08X] => [%5d %5d %5d]\n", data[MPU6050_AXIS_X],
-			data[MPU6050_AXIS_Y], data[MPU6050_AXIS_Z], data[MPU6050_AXIS_X],
+		GSE_LOG("[%08X %08X %08X] => [%5d %5d %5d]\n",
+			data[MPU6050_AXIS_X], data[MPU6050_AXIS_Y],
+			data[MPU6050_AXIS_Z], data[MPU6050_AXIS_X],
 			data[MPU6050_AXIS_Y], data[MPU6050_AXIS_Z]);
 	}
 #ifdef CONFIG_MPU6050_LOWPASS
 	if (atomic_read(&priv->filter)) {
-		if (atomic_read(&priv->fir_en) && !atomic_read(&priv->suspend)) {
+		if (atomic_read(&priv->fir_en) &&
+			!atomic_read(&priv->suspend)) {
 			int idx, firlen = atomic_read(&priv->firlen);
 
 			if (priv->fir.num < firlen) {
-				priv->fir.raw[priv->fir.num][MPU6050_AXIS_X] = data[MPU6050_AXIS_X];
-				priv->fir.raw[priv->fir.num][MPU6050_AXIS_Y] = data[MPU6050_AXIS_Y];
-				priv->fir.raw[priv->fir.num][MPU6050_AXIS_Z] = data[MPU6050_AXIS_Z];
-				priv->fir.sum[MPU6050_AXIS_X] += data[MPU6050_AXIS_X];
-				priv->fir.sum[MPU6050_AXIS_Y] += data[MPU6050_AXIS_Y];
-				priv->fir.sum[MPU6050_AXIS_Z] += data[MPU6050_AXIS_Z];
-				if (atomic_read(&priv->trace) & MPU6050_TRC_FILTER) {
-					GSE_LOG("add [%2d] [%5d %5d %5d] => [%5d %5d %5d]\n", priv->fir.num,
-					priv->fir.raw[priv->fir.num][MPU6050_AXIS_X],
-					priv->fir.raw[priv->fir.num][MPU6050_AXIS_Y],
-					priv->fir.raw[priv->fir.num][MPU6050_AXIS_Z],
-					priv->fir.sum[MPU6050_AXIS_X], priv->fir.sum[MPU6050_AXIS_Y],
+				priv->fir.raw[priv->fir.num][MPU6050_AXIS_X] =
+					data[MPU6050_AXIS_X];
+				priv->fir.raw[priv->fir.num][MPU6050_AXIS_Y] =
+					data[MPU6050_AXIS_Y];
+				priv->fir.raw[priv->fir.num][MPU6050_AXIS_Z] =
+					data[MPU6050_AXIS_Z];
+				priv->fir.sum[MPU6050_AXIS_X] +=
+					data[MPU6050_AXIS_X];
+				priv->fir.sum[MPU6050_AXIS_Y] +=
+					data[MPU6050_AXIS_Y];
+				priv->fir.sum[MPU6050_AXIS_Z] +=
+					data[MPU6050_AXIS_Z];
+				if (atomic_read(&priv->trace) &
+					MPU6050_TRC_FILTER) {
+					GSE_LOG("add [%2d] [%5d %5d %5d] => ",
+				priv->fir.num,
+				priv->fir.raw[priv->fir.num][MPU6050_AXIS_X],
+				priv->fir.raw[priv->fir.num][MPU6050_AXIS_Y],
+				priv->fir.raw[priv->fir.num][MPU6050_AXIS_Z]);
+					GSE_LOG("[%5d %5d %5d]\n",
+					priv->fir.sum[MPU6050_AXIS_X],
+					priv->fir.sum[MPU6050_AXIS_Y],
 					priv->fir.sum[MPU6050_AXIS_Z]);
 				}
 				priv->fir.num++;
 				priv->fir.idx++;
 			} else {
 				idx = priv->fir.idx % firlen;
-				priv->fir.sum[MPU6050_AXIS_X] -= priv->fir.raw[idx][MPU6050_AXIS_X];
-				priv->fir.sum[MPU6050_AXIS_Y] -= priv->fir.raw[idx][MPU6050_AXIS_Y];
-				priv->fir.sum[MPU6050_AXIS_Z] -= priv->fir.raw[idx][MPU6050_AXIS_Z];
-				priv->fir.raw[idx][MPU6050_AXIS_X] = data[MPU6050_AXIS_X];
-				priv->fir.raw[idx][MPU6050_AXIS_Y] = data[MPU6050_AXIS_Y];
-				priv->fir.raw[idx][MPU6050_AXIS_Z] = data[MPU6050_AXIS_Z];
-				priv->fir.sum[MPU6050_AXIS_X] += data[MPU6050_AXIS_X];
-				priv->fir.sum[MPU6050_AXIS_Y] += data[MPU6050_AXIS_Y];
-				priv->fir.sum[MPU6050_AXIS_Z] += data[MPU6050_AXIS_Z];
+				priv->fir.sum[MPU6050_AXIS_X] -=
+					priv->fir.raw[idx][MPU6050_AXIS_X];
+				priv->fir.sum[MPU6050_AXIS_Y] -=
+					priv->fir.raw[idx][MPU6050_AXIS_Y];
+				priv->fir.sum[MPU6050_AXIS_Z] -=
+					priv->fir.raw[idx][MPU6050_AXIS_Z];
+				priv->fir.raw[idx][MPU6050_AXIS_X] =
+					data[MPU6050_AXIS_X];
+				priv->fir.raw[idx][MPU6050_AXIS_Y] =
+					data[MPU6050_AXIS_Y];
+				priv->fir.raw[idx][MPU6050_AXIS_Z] =
+					data[MPU6050_AXIS_Z];
+				priv->fir.sum[MPU6050_AXIS_X] +=
+					data[MPU6050_AXIS_X];
+				priv->fir.sum[MPU6050_AXIS_Y] +=
+					data[MPU6050_AXIS_Y];
+				priv->fir.sum[MPU6050_AXIS_Z] +=
+					data[MPU6050_AXIS_Z];
 				priv->fir.idx++;
-				data[MPU6050_AXIS_X] = priv->fir.sum[MPU6050_AXIS_X]/firlen;
-				data[MPU6050_AXIS_Y] = priv->fir.sum[MPU6050_AXIS_Y]/firlen;
-				data[MPU6050_AXIS_Z] = priv->fir.sum[MPU6050_AXIS_Z]/firlen;
-				if (atomic_read(&priv->trace) & MPU6050_TRC_FILTER)
-					GSE_LOG("add [%2d] [%5d %5d %5d] => [%5d %5d %5d] : [%5d %5d %5d]\n",
+				data[MPU6050_AXIS_X] =
+					priv->fir.sum[MPU6050_AXIS_X]/firlen;
+				data[MPU6050_AXIS_Y] =
+					priv->fir.sum[MPU6050_AXIS_Y]/firlen;
+				data[MPU6050_AXIS_Z] =
+					priv->fir.sum[MPU6050_AXIS_Z]/firlen;
+				if (atomic_read(&priv->trace) &
+					MPU6050_TRC_FILTER)
+					GSE_LOG("add [%2d] [%5d %5d %5d] =>",
 					idx,
-					priv->fir.raw[idx][MPU6050_AXIS_X], priv->fir.raw[idx][MPU6050_AXIS_Y],
-					priv->fir.raw[idx][MPU6050_AXIS_Z], priv->fir.sum[MPU6050_AXIS_X],
-					priv->fir.sum[MPU6050_AXIS_Y], priv->fir.sum[MPU6050_AXIS_Z],
-					data[MPU6050_AXIS_X], data[MPU6050_AXIS_Y], data[MPU6050_AXIS_Z]);
+					priv->fir.raw[idx][MPU6050_AXIS_X],
+					priv->fir.raw[idx][MPU6050_AXIS_Y],
+					priv->fir.raw[idx][MPU6050_AXIS_Z]);
+					GSE_LOG("[%5d %5d %5d] : ",
+					priv->fir.sum[MPU6050_AXIS_X],
+					priv->fir.sum[MPU6050_AXIS_Y],
+					priv->fir.sum[MPU6050_AXIS_Z]);
+
+					GSE_LOG("[%5d %5d %5d]\n",
+					data[MPU6050_AXIS_X],
+					data[MPU6050_AXIS_Y],
+					data[MPU6050_AXIS_Z]);
 			}
 		}
 	}
@@ -417,13 +458,15 @@ static int MPU6050_ReadData(struct i2c_client *client, s16 data[MPU6050_AXES_NUM
 }
 
 /*----------------------------------------------------------------------------*/
-static int MPU6050_ReadOffset(struct i2c_client *client, s8 ofs[MPU6050_AXES_NUM])
+static int MPU6050_ReadOffset(struct i2c_client *client,
+	s8 ofs[MPU6050_AXES_NUM])
 {
 	int err = 0;
 #ifdef SW_CALIBRATION
 	ofs[0] = ofs[1] = ofs[2] = 0x0;
 #else
-	err = mpu_i2c_read_block(client, MPU6050_REG_OFSX, ofs, MPU6050_AXES_NUM);
+	err = mpu_i2c_read_block(client, MPU6050_REG_OFSX,
+		ofs, MPU6050_AXES_NUM);
 	if (err)
 		GSE_ERR("error: %d\n", err);
 
@@ -444,7 +487,8 @@ static int MPU6050_ResetCalibration(struct i2c_client *client)
 #ifdef SW_CALIBRATION
 	/* do not thing */
 #else
-	err = hwmsen_write_block(client, MPU6050_REG_OFSX, ofs, MPU6050_AXES_NUM);
+	err = hwmsen_write_block(client, MPU6050_REG_OFSX,
+		ofs, MPU6050_AXES_NUM);
 	if (err)
 		GSE_ERR("error: %d\n", err);
 
@@ -457,7 +501,8 @@ static int MPU6050_ResetCalibration(struct i2c_client *client)
 }
 
 /*----------------------------------------------------------------------------*/
-static int MPU6050_ReadCalibration(struct i2c_client *client, int dat[MPU6050_AXES_NUM])
+static int MPU6050_ReadCalibration(struct i2c_client *client,
+	int dat[MPU6050_AXES_NUM])
 {
 	struct mpu6050_i2c_data *obj = i2c_get_clientdata(client);
 #ifdef SW_CALIBRATION
@@ -466,7 +511,8 @@ static int MPU6050_ReadCalibration(struct i2c_client *client, int dat[MPU6050_AX
 	int err;
 #endif
 #ifdef SW_CALIBRATION
-	mul = 0;		/* only SW Calibration, disable HW Calibration */
+	/* only SW Calibration, disable HW Calibration */
+	mul = 0;
 #else
 
 	err = MPU6050_ReadOffset(client, obj->offset);
@@ -477,17 +523,23 @@ static int MPU6050_ReadCalibration(struct i2c_client *client, int dat[MPU6050_AX
 	mul = obj->reso->sensitivity / mpu6050_offset_resolution.sensitivity;
 #endif
 	dat[obj->cvt.map[MPU6050_AXIS_X]] =
-		obj->cvt.sign[MPU6050_AXIS_X]*(obj->offset[MPU6050_AXIS_X]*mul + obj->cali_sw[MPU6050_AXIS_X]);
+		obj->cvt.sign[MPU6050_AXIS_X] *
+		(obj->offset[MPU6050_AXIS_X]*mul +
+		obj->cali_sw[MPU6050_AXIS_X]);
 	dat[obj->cvt.map[MPU6050_AXIS_Y]] =
-		obj->cvt.sign[MPU6050_AXIS_Y]*(obj->offset[MPU6050_AXIS_Y]*mul + obj->cali_sw[MPU6050_AXIS_Y]);
+		obj->cvt.sign[MPU6050_AXIS_Y] *
+		(obj->offset[MPU6050_AXIS_Y]*mul +
+		obj->cali_sw[MPU6050_AXIS_Y]);
 	dat[obj->cvt.map[MPU6050_AXIS_Z]] =
-		obj->cvt.sign[MPU6050_AXIS_Z]*(obj->offset[MPU6050_AXIS_Z]*mul + obj->cali_sw[MPU6050_AXIS_Z]);
+		obj->cvt.sign[MPU6050_AXIS_Z]*
+		(obj->offset[MPU6050_AXIS_Z]*mul +
+		obj->cali_sw[MPU6050_AXIS_Z]);
 
 	return 0;
 }
 /*----------------------------------------------------------------------------*/
-static int MPU6050_ReadCalibrationEx(struct i2c_client *client, int act[MPU6050_AXES_NUM],
-				     int raw[MPU6050_AXES_NUM])
+static int MPU6050_ReadCalibrationEx(struct i2c_client *client,
+	int act[MPU6050_AXES_NUM], int raw[MPU6050_AXES_NUM])
 {
 	/*raw: the raw calibration data; act: the actual calibration data */
 	struct mpu6050_i2c_data *obj = i2c_get_clientdata(client);
@@ -497,7 +549,8 @@ static int MPU6050_ReadCalibrationEx(struct i2c_client *client, int act[MPU6050_
 	int err;
 #endif
 #ifdef SW_CALIBRATION
-	mul = 0;		/* only SW Calibration, disable HW Calibration */
+	/* only SW Calibration, disable HW Calibration */
+	mul = 0;
 #else
 
 	err = MPU6050_ReadOffset(client, obj->offset);
@@ -508,19 +561,26 @@ static int MPU6050_ReadCalibrationEx(struct i2c_client *client, int act[MPU6050_
 	mul = obj->reso->sensitivity / mpu6050_offset_resolution.sensitivity;
 #endif
 
-	raw[MPU6050_AXIS_X] = obj->offset[MPU6050_AXIS_X]*mul + obj->cali_sw[MPU6050_AXIS_X];
-	raw[MPU6050_AXIS_Y] = obj->offset[MPU6050_AXIS_Y]*mul + obj->cali_sw[MPU6050_AXIS_Y];
-	raw[MPU6050_AXIS_Z] = obj->offset[MPU6050_AXIS_Z]*mul + obj->cali_sw[MPU6050_AXIS_Z];
+	raw[MPU6050_AXIS_X] = obj->offset[MPU6050_AXIS_X]*mul +
+	obj->cali_sw[MPU6050_AXIS_X];
+	raw[MPU6050_AXIS_Y] = obj->offset[MPU6050_AXIS_Y]*mul +
+		obj->cali_sw[MPU6050_AXIS_Y];
+	raw[MPU6050_AXIS_Z] = obj->offset[MPU6050_AXIS_Z]*mul +
+		obj->cali_sw[MPU6050_AXIS_Z];
 
-	act[obj->cvt.map[MPU6050_AXIS_X]] = obj->cvt.sign[MPU6050_AXIS_X] * raw[MPU6050_AXIS_X];
-	act[obj->cvt.map[MPU6050_AXIS_Y]] = obj->cvt.sign[MPU6050_AXIS_Y] * raw[MPU6050_AXIS_Y];
-	act[obj->cvt.map[MPU6050_AXIS_Z]] = obj->cvt.sign[MPU6050_AXIS_Z] * raw[MPU6050_AXIS_Z];
+	act[obj->cvt.map[MPU6050_AXIS_X]] =
+		obj->cvt.sign[MPU6050_AXIS_X] * raw[MPU6050_AXIS_X];
+	act[obj->cvt.map[MPU6050_AXIS_Y]] =
+		obj->cvt.sign[MPU6050_AXIS_Y] * raw[MPU6050_AXIS_Y];
+	act[obj->cvt.map[MPU6050_AXIS_Z]] =
+		obj->cvt.sign[MPU6050_AXIS_Z] * raw[MPU6050_AXIS_Z];
 
 	return 0;
 }
 
 /*----------------------------------------------------------------------------*/
-static int MPU6050_WriteCalibration(struct i2c_client *client, int dat[MPU6050_AXES_NUM])
+static int MPU6050_WriteCalibration(struct i2c_client *client,
+	int dat[MPU6050_AXES_NUM])
 {
 	struct mpu6050_i2c_data *obj = i2c_get_clientdata(client);
 	int err;
@@ -535,10 +595,12 @@ static int MPU6050_WriteCalibration(struct i2c_client *client, int dat[MPU6050_A
 		return err;
 	}
 
-	GSE_LOG("OLDOFF: (%+3d %+3d %+3d): (%+3d %+3d %+3d) / (%+3d %+3d %+3d)\n",
-		raw[MPU6050_AXIS_X], raw[MPU6050_AXIS_Y], raw[MPU6050_AXIS_Z],
-		obj->offset[MPU6050_AXIS_X], obj->offset[MPU6050_AXIS_Y], obj->offset[MPU6050_AXIS_Z],
-		obj->cali_sw[MPU6050_AXIS_X], obj->cali_sw[MPU6050_AXIS_Y], obj->cali_sw[MPU6050_AXIS_Z]);
+GSE_LOG("OLDOFF:(%+3d %+3d %+3d):(%+3d %+3d %+3d)/(%+3d %+3d %+3d)\n",
+		raw[MPU6050_AXIS_X], raw[MPU6050_AXIS_Y],
+		raw[MPU6050_AXIS_Z], obj->offset[MPU6050_AXIS_X],
+		obj->offset[MPU6050_AXIS_Y], obj->offset[MPU6050_AXIS_Z],
+		obj->cali_sw[MPU6050_AXIS_X], obj->cali_sw[MPU6050_AXIS_Y],
+		obj->cali_sw[MPU6050_AXIS_Z]);
 
 	/*calculate the real offset expected by caller */
 	cali[MPU6050_AXIS_X] += dat[MPU6050_AXIS_X];
@@ -548,31 +610,48 @@ static int MPU6050_WriteCalibration(struct i2c_client *client, int dat[MPU6050_A
 	GSE_LOG("UPDATE: (%+3d %+3d %+3d)\n",
 		dat[MPU6050_AXIS_X], dat[MPU6050_AXIS_Y], dat[MPU6050_AXIS_Z]);
 #ifdef SW_CALIBRATION
-	obj->cali_sw[MPU6050_AXIS_X] = obj->cvt.sign[MPU6050_AXIS_X]*(cali[obj->cvt.map[MPU6050_AXIS_X]]);
-	obj->cali_sw[MPU6050_AXIS_Y] = obj->cvt.sign[MPU6050_AXIS_Y]*(cali[obj->cvt.map[MPU6050_AXIS_Y]]);
-	obj->cali_sw[MPU6050_AXIS_Z] = obj->cvt.sign[MPU6050_AXIS_Z]*(cali[obj->cvt.map[MPU6050_AXIS_Z]]);
+	obj->cali_sw[MPU6050_AXIS_X] = obj->cvt.sign[MPU6050_AXIS_X] *
+		(cali[obj->cvt.map[MPU6050_AXIS_X]]);
+	obj->cali_sw[MPU6050_AXIS_Y] = obj->cvt.sign[MPU6050_AXIS_Y] *
+		(cali[obj->cvt.map[MPU6050_AXIS_Y]]);
+	obj->cali_sw[MPU6050_AXIS_Z] = obj->cvt.sign[MPU6050_AXIS_Z] *
+		(cali[obj->cvt.map[MPU6050_AXIS_Z]]);
 #else
 
 	obj->offset[MPU6050_AXIS_X] =
-		(s8)(obj->cvt.sign[MPU6050_AXIS_X]*(cali[obj->cvt.map[MPU6050_AXIS_X]])/(divisor));
+		(s8)(obj->cvt.sign[MPU6050_AXIS_X] *
+		(cali[obj->cvt.map[MPU6050_AXIS_X]])/(divisor));
 	obj->offset[MPU6050_AXIS_Y] =
-		(s8)(obj->cvt.sign[MPU6050_AXIS_Y]*(cali[obj->cvt.map[MPU6050_AXIS_Y]])/(divisor));
+		(s8)(obj->cvt.sign[MPU6050_AXIS_Y] *
+		(cali[obj->cvt.map[MPU6050_AXIS_Y]])/(divisor));
 	obj->offset[MPU6050_AXIS_Z] =
-		(s8)(obj->cvt.sign[MPU6050_AXIS_Z]*(cali[obj->cvt.map[MPU6050_AXIS_Z]])/(divisor));
+		(s8)(obj->cvt.sign[MPU6050_AXIS_Z] *
+		(cali[obj->cvt.map[MPU6050_AXIS_Z]])/(divisor));
 
 	/*convert software calibration using standard calibration*/
-	obj->cali_sw[MPU6050_AXIS_X] = obj->cvt.sign[MPU6050_AXIS_X]*(cali[obj->cvt.map[MPU6050_AXIS_X]])%(divisor);
-	obj->cali_sw[MPU6050_AXIS_Y] = obj->cvt.sign[MPU6050_AXIS_Y]*(cali[obj->cvt.map[MPU6050_AXIS_Y]])%(divisor);
-	obj->cali_sw[MPU6050_AXIS_Z] = obj->cvt.sign[MPU6050_AXIS_Z]*(cali[obj->cvt.map[MPU6050_AXIS_Z]])%(divisor);
+	obj->cali_sw[MPU6050_AXIS_X] =
+		obj->cvt.sign[MPU6050_AXIS_X] *
+		(cali[obj->cvt.map[MPU6050_AXIS_X]])%(divisor);
+	obj->cali_sw[MPU6050_AXIS_Y] =
+		obj->cvt.sign[MPU6050_AXIS_Y] *
+		(cali[obj->cvt.map[MPU6050_AXIS_Y]])%(divisor);
+	obj->cali_sw[MPU6050_AXIS_Z] =
+		obj->cvt.sign[MPU6050_AXIS_Z] *
+		(cali[obj->cvt.map[MPU6050_AXIS_Z]])%(divisor);
 
-	GSE_LOG("NEWOFF: (%+3d %+3d %+3d): (%+3d %+3d %+3d) / (%+3d %+3d %+3d)\n",
-		obj->offset[MPU6050_AXIS_X]*divisor + obj->cali_sw[MPU6050_AXIS_X],
-		obj->offset[MPU6050_AXIS_Y]*divisor + obj->cali_sw[MPU6050_AXIS_Y],
-		obj->offset[MPU6050_AXIS_Z]*divisor + obj->cali_sw[MPU6050_AXIS_Z],
-		obj->offset[MPU6050_AXIS_X], obj->offset[MPU6050_AXIS_Y], obj->offset[MPU6050_AXIS_Z],
-		obj->cali_sw[MPU6050_AXIS_X], obj->cali_sw[MPU6050_AXIS_Y], obj->cali_sw[MPU6050_AXIS_Z]);
+GSE_LOG("NEWOFF:(%+3d %+3d %+3d):(%+3d %+3d %+3d)/(%+3d %+3d %+3d)\n",
+		obj->offset[MPU6050_AXIS_X]*divisor +
+		obj->cali_sw[MPU6050_AXIS_X],
+		obj->offset[MPU6050_AXIS_Y]*divisor +
+		obj->cali_sw[MPU6050_AXIS_Y],
+		obj->offset[MPU6050_AXIS_Z]*divisor +
+		obj->cali_sw[MPU6050_AXIS_Z],
+		obj->offset[MPU6050_AXIS_X], obj->offset[MPU6050_AXIS_Y],
+		obj->offset[MPU6050_AXIS_Z], obj->cali_sw[MPU6050_AXIS_X],
+		obj->cali_sw[MPU6050_AXIS_Y], obj->cali_sw[MPU6050_AXIS_Z]);
 
-	err = hwmsen_write_block(obj->client, MPU6050_REG_OFSX, obj->offset, MPU6050_AXES_NUM);
+	err = hwmsen_write_block(obj->client, MPU6050_REG_OFSX,
+		obj->offset, MPU6050_AXES_NUM);
 	if (err) {
 		GSE_ERR("write offset fail: %d\n", err);
 		return err;
@@ -609,13 +688,15 @@ static int MPU6050_SetDataFormat(struct i2c_client *client, u8 dataformat)
 	int res = 0;
 
 	memset(databuf, 0, sizeof(u8)*2);
-	res = mpu_i2c_read_block(client, MPU6050_REG_DATA_FORMAT, databuf, 0x1);
+	res = mpu_i2c_read_block(client, MPU6050_REG_DATA_FORMAT,
+		databuf, 0x1);
 	if (res < 0)
 		return res;
 
 	/* write */
 	databuf[0] = databuf[0] | dataformat;
-	res = mpu_i2c_write_block(client, MPU6050_REG_DATA_FORMAT, databuf, 0x1);
+	res = mpu_i2c_write_block(client, MPU6050_REG_DATA_FORMAT,
+		databuf, 0x1);
 
 	if (res < 0)
 		return res;
@@ -633,13 +714,15 @@ static int MPU6050_SetBWRate(struct i2c_client *client, u8 bwrate)
 		memset(databuf, 0, sizeof(u8)*10);
 
 		/* read */
-		res = mpu_i2c_read_block(client, MPU6050_REG_BW_RATE, databuf, 0x1);
+		res = mpu_i2c_read_block(client, MPU6050_REG_BW_RATE,
+			databuf, 0x1);
 		if (res < 0)
 			return res;
 
 		/* write */
 		databuf[0] = databuf[0] | bwrate;
-		res = mpu_i2c_write_block(client, MPU6050_REG_BW_RATE, databuf, 0x1);
+		res = mpu_i2c_write_block(client, MPU6050_REG_BW_RATE,
+			databuf, 0x1);
 
 		if (res < 0)
 			return res;
@@ -659,19 +742,22 @@ static int MPU6050_Dev_Reset(struct i2c_client *client)
 	memset(databuf, 0, sizeof(u8) * 10);
 
 	/* read */
-	res = mpu_i2c_read_block(client, MPU6050_REG_POWER_CTL, databuf, 0x1);
+	res = mpu_i2c_read_block(client, MPU6050_REG_POWER_CTL,
+		databuf, 0x1);
 	if (res < 0)
 		return res;
 
 	/* write */
 	databuf[0] = databuf[0] | MPU6050_DEV_RESET;
-	res = mpu_i2c_write_block(client, MPU6050_REG_POWER_CTL, databuf, 0x1);
+	res = mpu_i2c_write_block(client, MPU6050_REG_POWER_CTL
+		, databuf, 0x1);
 
 	if (res < 0)
 		return res;
 
 	do {
-		res = mpu_i2c_read_block(client, MPU6050_REG_POWER_CTL, databuf, 0x1);
+		res = mpu_i2c_read_block(client, MPU6050_REG_POWER_CTL,
+			databuf, 0x1);
 		if (res < 0)
 			return res;
 		GSE_LOG("[Gsensor] check reset bit");
@@ -750,7 +836,8 @@ static int mpu6050_init_client(struct i2c_client *client, int reset_cali)
 		return res;
 	}
 
-	gsensor_gain.x = gsensor_gain.y = gsensor_gain.z = obj->reso->sensitivity;
+	gsensor_gain.x = gsensor_gain.y =
+		gsensor_gain.z = obj->reso->sensitivity;
 
 	res = MPU6050_SetIntEnable(client, 0x00);	/* disable INT */
 	if (res) {
@@ -800,7 +887,8 @@ static int MPU6050_ReadAllReg(struct i2c_client *client, char *buf, int bufsize)
 }
 
 /*----------------------------------------------------------------------------*/
-static int MPU6050_ReadChipInfo(struct i2c_client *client, char *buf, int bufsize)
+static int MPU6050_ReadChipInfo(struct i2c_client *client,
+	char *buf, int bufsize)
 {
 	u8 databuf[10];
 
@@ -820,9 +908,11 @@ static int MPU6050_ReadChipInfo(struct i2c_client *client, char *buf, int bufsiz
 }
 
 /*----------------------------------------------------------------------------*/
-static int MPU6050_ReadSensorData(struct i2c_client *client, char *buf, int bufsize)
+static int MPU6050_ReadSensorData(struct i2c_client *client,
+	char *buf, int bufsize)
 {
-	struct mpu6050_i2c_data *obj = obj_i2c_data;	/* (struct mpu6050_i2c_data*)i2c_get_clientdata(client); */
+	/* (struct mpu6050_i2c_data*)i2c_get_clientdata(client); */
+	struct mpu6050_i2c_data *obj = obj_i2c_data;
 	int acc[MPU6050_AXES_NUM];
 	int res = 0;
 
@@ -857,16 +947,23 @@ static int MPU6050_ReadSensorData(struct i2c_client *client, char *buf, int bufs
 	obj->data[MPU6050_AXIS_Z] += obj->cali_sw[MPU6050_AXIS_Z];
 
 	/*remap coordinate*/
-	acc[obj->cvt.map[MPU6050_AXIS_X]] = obj->cvt.sign[MPU6050_AXIS_X]*obj->data[MPU6050_AXIS_X];
-	acc[obj->cvt.map[MPU6050_AXIS_Y]] = obj->cvt.sign[MPU6050_AXIS_Y]*obj->data[MPU6050_AXIS_Y];
-	acc[obj->cvt.map[MPU6050_AXIS_Z]] = obj->cvt.sign[MPU6050_AXIS_Z]*obj->data[MPU6050_AXIS_Z];
+	acc[obj->cvt.map[MPU6050_AXIS_X]] =
+	obj->cvt.sign[MPU6050_AXIS_X]*obj->data[MPU6050_AXIS_X];
+	acc[obj->cvt.map[MPU6050_AXIS_Y]] =
+		obj->cvt.sign[MPU6050_AXIS_Y]*obj->data[MPU6050_AXIS_Y];
+	acc[obj->cvt.map[MPU6050_AXIS_Z]] =
+		obj->cvt.sign[MPU6050_AXIS_Z]*obj->data[MPU6050_AXIS_Z];
 
 	/* Out put the mg */
-	acc[MPU6050_AXIS_X] = acc[MPU6050_AXIS_X] * GRAVITY_EARTH_1000 / obj->reso->sensitivity;
-	acc[MPU6050_AXIS_Y] = acc[MPU6050_AXIS_Y] * GRAVITY_EARTH_1000 / obj->reso->sensitivity;
-	acc[MPU6050_AXIS_Z] = acc[MPU6050_AXIS_Z] * GRAVITY_EARTH_1000 / obj->reso->sensitivity;
+	acc[MPU6050_AXIS_X] = acc[MPU6050_AXIS_X] *
+	GRAVITY_EARTH_1000 / obj->reso->sensitivity;
+	acc[MPU6050_AXIS_Y] = acc[MPU6050_AXIS_Y] *
+		GRAVITY_EARTH_1000 / obj->reso->sensitivity;
+	acc[MPU6050_AXIS_Z] = acc[MPU6050_AXIS_Z] *
+		GRAVITY_EARTH_1000 / obj->reso->sensitivity;
 
-	sprintf(buf, "%04x %04x %04x", acc[MPU6050_AXIS_X], acc[MPU6050_AXIS_Y], acc[MPU6050_AXIS_Z]);
+	sprintf(buf, "%04x %04x %04x", acc[MPU6050_AXIS_X],
+		acc[MPU6050_AXIS_Y], acc[MPU6050_AXIS_Z]);
 	if (atomic_read(&obj->trace) & MPU6050_TRC_IOCTL)
 		GSE_LOG("gsensor data: %s!\n", buf);
 
@@ -876,7 +973,8 @@ static int MPU6050_ReadSensorData(struct i2c_client *client, char *buf, int bufs
 /*----------------------------------------------------------------------------*/
 static int MPU6050_ReadRawData(struct i2c_client *client, char *buf)
 {
-	struct mpu6050_i2c_data *obj = (struct mpu6050_i2c_data *)i2c_get_clientdata(client);
+	struct mpu6050_i2c_data *obj =
+		(struct mpu6050_i2c_data *)i2c_get_clientdata(client);
 	int res = 0;
 
 	if (!buf || !client)
@@ -907,7 +1005,8 @@ static int MPU6050_InitSelfTest(struct i2c_client *client)
 		return res;
 	}
 
-	res = mpu_i2c_read_block(client, MPU6050_REG_DATA_FORMAT, &data, 1);
+	res = mpu_i2c_read_block(client, MPU6050_REG_DATA_FORMAT,
+		&data, 1);
 
 	if (res)
 		return res;
@@ -917,7 +1016,8 @@ static int MPU6050_InitSelfTest(struct i2c_client *client)
 }
 
 /*----------------------------------------------------------------------------*/
-static int MPU6050_JudgeTestResult(struct i2c_client *client, s32 prv[MPU6050_AXES_NUM], s32 nxt[MPU6050_AXES_NUM])
+static int MPU6050_JudgeTestResult(struct i2c_client *client,
+	s32 prv[MPU6050_AXES_NUM], s32 nxt[MPU6050_AXES_NUM])
 {
 	struct criteria {
 		int min;
@@ -972,23 +1072,32 @@ static int MPU6050_JudgeTestResult(struct i2c_client *client, s32 prv[MPU6050_AX
 	}
 	GSE_LOG("format=0x%x\n", format);
 
-	GSE_LOG("X diff is %ld\n", abs(nxt[MPU6050_AXIS_X] - prv[MPU6050_AXIS_X]));
-	GSE_LOG("Y diff is %ld\n", abs(nxt[MPU6050_AXIS_Y] - prv[MPU6050_AXIS_Y]));
-	GSE_LOG("Z diff is %ld\n", abs(nxt[MPU6050_AXIS_Z] - prv[MPU6050_AXIS_Z]));
+	GSE_LOG("X diff is %ld\n",
+		abs(nxt[MPU6050_AXIS_X] - prv[MPU6050_AXIS_X]));
+	GSE_LOG("Y diff is %ld\n",
+		abs(nxt[MPU6050_AXIS_Y] - prv[MPU6050_AXIS_Y]));
+	GSE_LOG("Z diff is %ld\n",
+		abs(nxt[MPU6050_AXIS_Z] - prv[MPU6050_AXIS_Z]));
 
 
-	if ((abs(nxt[MPU6050_AXIS_X] - prv[MPU6050_AXIS_X]) > (*ptr)[MPU6050_AXIS_X].max) ||
-	    (abs(nxt[MPU6050_AXIS_X] - prv[MPU6050_AXIS_X]) < (*ptr)[MPU6050_AXIS_X].min)) {
+	if ((abs(nxt[MPU6050_AXIS_X] - prv[MPU6050_AXIS_X]) >
+		(*ptr)[MPU6050_AXIS_X].max) ||
+	    (abs(nxt[MPU6050_AXIS_X] - prv[MPU6050_AXIS_X]) <
+	    (*ptr)[MPU6050_AXIS_X].min)) {
 		GSE_ERR("X is over range\n");
 		res = -EINVAL;
 	}
-	if ((abs(nxt[MPU6050_AXIS_Y] - prv[MPU6050_AXIS_Y]) > (*ptr)[MPU6050_AXIS_Y].max) ||
-	    (abs(nxt[MPU6050_AXIS_Y] - prv[MPU6050_AXIS_Y]) < (*ptr)[MPU6050_AXIS_Y].min)) {
+	if ((abs(nxt[MPU6050_AXIS_Y] - prv[MPU6050_AXIS_Y]) >
+		(*ptr)[MPU6050_AXIS_Y].max) ||
+	    (abs(nxt[MPU6050_AXIS_Y] - prv[MPU6050_AXIS_Y]) <
+	    (*ptr)[MPU6050_AXIS_Y].min)) {
 		GSE_ERR("Y is over range\n");
 		res = -EINVAL;
 	}
-	if ((abs(nxt[MPU6050_AXIS_Z] - prv[MPU6050_AXIS_Z]) > (*ptr)[MPU6050_AXIS_Z].max) ||
-	    (abs(nxt[MPU6050_AXIS_Z] - prv[MPU6050_AXIS_Z]) < (*ptr)[MPU6050_AXIS_Z].min)) {
+	if ((abs(nxt[MPU6050_AXIS_Z] - prv[MPU6050_AXIS_Z]) >
+		(*ptr)[MPU6050_AXIS_Z].max) ||
+	    (abs(nxt[MPU6050_AXIS_Z] - prv[MPU6050_AXIS_Z]) <
+	    (*ptr)[MPU6050_AXIS_Z].min)) {
 		GSE_ERR("Z is over range\n");
 		res = -EINVAL;
 	}
@@ -1052,22 +1161,33 @@ static ssize_t show_cali_value(struct device_driver *ddri, char *buf)
 		return -EINVAL;
 
 	mul = obj->reso->sensitivity/mpu6050_offset_resolution.sensitivity;
-	len += snprintf(buf+len, PAGE_SIZE-len, "[HW ][%d] (%+3d, %+3d, %+3d) : (0x%02X, 0x%02X, 0x%02X)\n", mul,
-		obj->offset[MPU6050_AXIS_X], obj->offset[MPU6050_AXIS_Y], obj->offset[MPU6050_AXIS_Z],
-		obj->offset[MPU6050_AXIS_X], obj->offset[MPU6050_AXIS_Y], obj->offset[MPU6050_AXIS_Z]);
-	len += snprintf(buf+len, PAGE_SIZE-len, "[SW ][%d] (%+3d, %+3d, %+3d)\n", 1,
-		obj->cali_sw[MPU6050_AXIS_X], obj->cali_sw[MPU6050_AXIS_Y], obj->cali_sw[MPU6050_AXIS_Z]);
+	len += snprintf(buf+len, PAGE_SIZE-len,
+		"[HW ][%d] (%+3d, %+3d, %+3d) : (0x%02X, 0x%02X, 0x%02X)\n",
+		mul, obj->offset[MPU6050_AXIS_X],
+		obj->offset[MPU6050_AXIS_Y], obj->offset[MPU6050_AXIS_Z],
+		obj->offset[MPU6050_AXIS_X], obj->offset[MPU6050_AXIS_Y],
+		obj->offset[MPU6050_AXIS_Z]);
+	len += snprintf(buf+len, PAGE_SIZE-len,
+		"[SW ][%d] (%+3d, %+3d, %+3d)\n", 1,
+		obj->cali_sw[MPU6050_AXIS_X], obj->cali_sw[MPU6050_AXIS_Y],
+		obj->cali_sw[MPU6050_AXIS_Z]);
 
-	len += snprintf(buf+len, PAGE_SIZE-len, "[ALL]    (%+3d, %+3d, %+3d) : (%+3d, %+3d, %+3d)\n",
-		obj->offset[MPU6050_AXIS_X] * mul + obj->cali_sw[MPU6050_AXIS_X],
-		obj->offset[MPU6050_AXIS_Y] * mul + obj->cali_sw[MPU6050_AXIS_Y],
-		obj->offset[MPU6050_AXIS_Z] * mul + obj->cali_sw[MPU6050_AXIS_Z],
-		tmp[MPU6050_AXIS_X], tmp[MPU6050_AXIS_Y], tmp[MPU6050_AXIS_Z]);
+	len += snprintf(buf+len, PAGE_SIZE-len,
+		"[ALL]    (%+3d, %+3d, %+3d) : (%+3d, %+3d, %+3d)\n",
+		obj->offset[MPU6050_AXIS_X] * mul +
+		obj->cali_sw[MPU6050_AXIS_X],
+		obj->offset[MPU6050_AXIS_Y] * mul +
+		obj->cali_sw[MPU6050_AXIS_Y],
+		obj->offset[MPU6050_AXIS_Z] * mul +
+		obj->cali_sw[MPU6050_AXIS_Z],
+		tmp[MPU6050_AXIS_X], tmp[MPU6050_AXIS_Y],
+		tmp[MPU6050_AXIS_Z]);
 	return len;
 }
 
 /*----------------------------------------------------------------------------*/
-static ssize_t store_cali_value(struct device_driver *ddri, const char *buf, size_t count)
+static ssize_t store_cali_value(struct device_driver *ddri,
+	const char *buf, size_t count)
 {
 	struct i2c_client *client = mpu6050_i2c_client;
 	int err, x, y, z;
@@ -1105,8 +1225,10 @@ static ssize_t show_self_value(struct device_driver *ddri, char *buf)
 	return snprintf(buf, 8, "%s\n", selftestRes);
 }
 /*----------------------------------------------------------------------------*/
-static ssize_t store_self_value(struct device_driver *ddri, const char *buf, size_t count)
-{				/*write anything to this register will trigger the process */
+static ssize_t store_self_value(struct device_driver *ddri,
+	const char *buf, size_t count)
+{
+	/*write anything to this register will trigger the process */
 	struct item {
 		s16 raw[MPU6050_AXES_NUM];
 	};
@@ -1150,8 +1272,10 @@ static ssize_t store_self_value(struct device_driver *ddri, const char *buf, siz
 		avg_prv[MPU6050_AXIS_X] += prv[idx].raw[MPU6050_AXIS_X];
 		avg_prv[MPU6050_AXIS_Y] += prv[idx].raw[MPU6050_AXIS_Y];
 		avg_prv[MPU6050_AXIS_Z] += prv[idx].raw[MPU6050_AXIS_Z];
-		GSE_LOG("Normal:[%5d %5d %5d]\n", prv[idx].raw[MPU6050_AXIS_X],
-			prv[idx].raw[MPU6050_AXIS_Y], prv[idx].raw[MPU6050_AXIS_Z]);
+		GSE_LOG("Normal:[%5d %5d %5d]\n",
+			prv[idx].raw[MPU6050_AXIS_X],
+			prv[idx].raw[MPU6050_AXIS_Y],
+			prv[idx].raw[MPU6050_AXIS_Z]);
 	}
 
 	avg_prv[MPU6050_AXIS_X] /= num;
@@ -1169,19 +1293,24 @@ static ssize_t store_self_value(struct device_driver *ddri, const char *buf, siz
 		avg_nxt[MPU6050_AXIS_X] += nxt[idx].raw[MPU6050_AXIS_X];
 		avg_nxt[MPU6050_AXIS_Y] += nxt[idx].raw[MPU6050_AXIS_Y];
 		avg_nxt[MPU6050_AXIS_Z] += nxt[idx].raw[MPU6050_AXIS_Z];
-		GSE_LOG("SELFTESt: [%5d %5d %5d]\n", nxt[idx].raw[MPU6050_AXIS_X],
-			nxt[idx].raw[MPU6050_AXIS_Y], nxt[idx].raw[MPU6050_AXIS_Z]);
+		GSE_LOG("SELFTESt: [%5d %5d %5d]\n",
+			nxt[idx].raw[MPU6050_AXIS_X],
+			nxt[idx].raw[MPU6050_AXIS_Y],
+			nxt[idx].raw[MPU6050_AXIS_Z]);
 	}
 
 	avg_nxt[MPU6050_AXIS_X] /= num;
 	avg_nxt[MPU6050_AXIS_Y] /= num;
 	avg_nxt[MPU6050_AXIS_Z] /= num;
 
-	GSE_LOG("X: %5d - %5d = %5d\n", avg_nxt[MPU6050_AXIS_X], avg_prv[MPU6050_AXIS_X],
+	GSE_LOG("X: %5d - %5d = %5d\n",
+		avg_nxt[MPU6050_AXIS_X], avg_prv[MPU6050_AXIS_X],
 		avg_nxt[MPU6050_AXIS_X] - avg_prv[MPU6050_AXIS_X]);
-	GSE_LOG("Y: %5d - %5d = %5d\n", avg_nxt[MPU6050_AXIS_Y], avg_prv[MPU6050_AXIS_Y],
+	GSE_LOG("Y: %5d - %5d = %5d\n",
+		avg_nxt[MPU6050_AXIS_Y], avg_prv[MPU6050_AXIS_Y],
 		avg_nxt[MPU6050_AXIS_Y] - avg_prv[MPU6050_AXIS_Y]);
-	GSE_LOG("Z: %5d - %5d = %5d\n", avg_nxt[MPU6050_AXIS_Z], avg_prv[MPU6050_AXIS_Z],
+	GSE_LOG("Z: %5d - %5d = %5d\n",
+		avg_nxt[MPU6050_AXIS_Z], avg_prv[MPU6050_AXIS_Z],
 		avg_nxt[MPU6050_AXIS_Z] - avg_prv[MPU6050_AXIS_Z]);
 
 	if (!MPU6050_JudgeTestResult(client, avg_prv, avg_nxt)) {
@@ -1215,7 +1344,8 @@ static ssize_t show_selftest_value(struct device_driver *ddri, char *buf)
 }
 
 /*----------------------------------------------------------------------------*/
-static ssize_t store_selftest_value(struct device_driver *ddri, const char *buf, size_t count)
+static ssize_t store_selftest_value(struct device_driver *ddri,
+	const char *buf, size_t count)
 {
 	struct mpu6050_i2c_data *obj = obj_i2c_data;
 	int tmp;
@@ -1234,8 +1364,9 @@ static ssize_t store_selftest_value(struct device_driver *ddri, const char *buf,
 			MPU6050_InitSelfTest(obj->client);
 		}
 
-		GSE_LOG("selftest: %d => %d\n", atomic_read(&obj->selftest), tmp);
-		atomic_set(&obj->selftest, tmp);
+		GSE_LOG("selftest: %d => %d\n",
+			atomic_read(&obj->selftest), tmp);
+			atomic_set(&obj->selftest, tmp);
 	} else {
 		GSE_ERR("invalid content: '%s', length = %zu\n", buf, count);
 	}
@@ -1255,22 +1386,30 @@ static ssize_t show_firlen_value(struct device_driver *ddri, char *buf)
 		GSE_LOG("len = %2d, idx = %2d\n", obj->fir.num, obj->fir.idx);
 
 		for (idx = 0; idx < len; idx++)
-			GSE_LOG("[%5d %5d %5d]\n", obj->fir.raw[idx][MPU6050_AXIS_X],
-				obj->fir.raw[idx][MPU6050_AXIS_Y], obj->fir.raw[idx][MPU6050_AXIS_Z]);
+			GSE_LOG("[%5d %5d %5d]\n",
+				obj->fir.raw[idx][MPU6050_AXIS_X],
+				obj->fir.raw[idx][MPU6050_AXIS_Y],
+				obj->fir.raw[idx][MPU6050_AXIS_Z]);
 
-		GSE_LOG("sum = [%5d %5d %5d]\n", obj->fir.sum[MPU6050_AXIS_X],
-			obj->fir.sum[MPU6050_AXIS_Y], obj->fir.sum[MPU6050_AXIS_Z]);
-		GSE_LOG("avg = [%5d %5d %5d]\n", obj->fir.sum[MPU6050_AXIS_X]/len,
-			obj->fir.sum[MPU6050_AXIS_Y]/len, obj->fir.sum[MPU6050_AXIS_Z]/len);
+		GSE_LOG("sum = [%5d %5d %5d]\n",
+			obj->fir.sum[MPU6050_AXIS_X],
+			obj->fir.sum[MPU6050_AXIS_Y],
+			obj->fir.sum[MPU6050_AXIS_Z]);
+		GSE_LOG("avg = [%5d %5d %5d]\n",
+			obj->fir.sum[MPU6050_AXIS_X]/len,
+			obj->fir.sum[MPU6050_AXIS_Y]/len,
+			obj->fir.sum[MPU6050_AXIS_Z]/len);
 	}
-	return snprintf(buf, PAGE_SIZE, "%d\n", atomic_read(&obj->firlen));
+	return snprintf(buf, PAGE_SIZE, "%d\n",
+		atomic_read(&obj->firlen));
 #else
 	return snprintf(buf, PAGE_SIZE, "not support\n");
 #endif
 }
 
 /*----------------------------------------------------------------------------*/
-static ssize_t store_firlen_value(struct device_driver *ddri, const char *buf, size_t count)
+static ssize_t store_firlen_value(struct device_driver *ddri,
+	const char *buf, size_t count)
 {
 #ifdef CONFIG_MPU6050_LOWPASS
 	struct i2c_client *client = mpu6050_i2c_client;
@@ -1310,7 +1449,8 @@ static ssize_t show_trace_value(struct device_driver *ddri, char *buf)
 }
 
 /*----------------------------------------------------------------------------*/
-static ssize_t store_trace_value(struct device_driver *ddri, const char *buf, size_t count)
+static ssize_t store_trace_value(struct device_driver *ddri,
+	const char *buf, size_t count)
 {
 	struct mpu6050_i2c_data *obj = obj_i2c_data;
 	int trace;
@@ -1341,7 +1481,8 @@ static ssize_t show_status_value(struct device_driver *ddri, char *buf)
 	}
 
 	len += snprintf(buf+len, PAGE_SIZE-len, "CUST: %d %d (%d %d)\n",
-		obj->hw.i2c_num, obj->hw.direction, obj->hw.power_id, obj->hw.power_vol);
+		obj->hw.i2c_num, obj->hw.direction,
+		obj->hw.power_id, obj->hw.power_vol);
 	return len;
 }
 
@@ -1379,8 +1520,8 @@ static int mpu6050_create_attr(struct device_driver *driver)
 	for (idx = 0; idx < num; idx++) {
 		err = driver_create_file(driver, mpu6050_attr_list[idx]);
 		if (err != 0) {
-			GSE_ERR("driver_create_file (%s) = %d\n", mpu6050_attr_list[idx]->attr.name,
-				err);
+			GSE_ERR("driver_create_file (%s) = %d\n",
+				mpu6050_attr_list[idx]->attr.name, err);
 			break;
 		}
 	}
@@ -1458,33 +1599,40 @@ int gsensor_operate(void *self, uint32_t command, void *buff_in, int size_in,
 			err = -EINVAL;
 		} else {
 			value = *(int *)buff_in;
-			if (((value == 0) && (sensor_power == false)) || ((value == 1) && (sensor_power == true)))
+			if (((value == 0) && (sensor_power == false)) ||
+				((value == 1) && (sensor_power == true)))
 				GSE_LOG("Gsensor device have updated!\n");
 			else
-				err = MPU6050_SetPowerMode(priv->client, !sensor_power);
+				err = MPU6050_SetPowerMode(priv->client,
+					!sensor_power);
 		}
 		break;
 
 	case SENSOR_GET_DATA:
-		if ((buff_out == NULL) || (size_out < sizeof(struct hwm_sensor_data))) {
+		if ((buff_out == NULL) ||
+			(size_out < sizeof(struct hwm_sensor_data))) {
 			GSE_ERR("get sensor data parameter error!\n");
 			err = -EINVAL;
 		} else {
 			gsensor_data = (struct hwm_sensor_data *) buff_out;
-			err = MPU6050_ReadSensorData(priv->client, buff, MPU6050_BUFSIZE);
+			err = MPU6050_ReadSensorData(priv->client,
+				buff, MPU6050_BUFSIZE);
 			if (!err) {
-				err = sscanf(buff, "%x %x %x", &gsensor_data->values[0],
-					&gsensor_data->values[1], &gsensor_data->values[2]);
+				err = sscanf(buff, "%x %x %x",
+					&gsensor_data->values[0],
+					&gsensor_data->values[1],
+					&gsensor_data->values[2]);
 				if (err == 3) {
-					gsensor_data->status = SENSOR_STATUS_ACCURACY_MEDIUM;
+					gsensor_data->status =
+						SENSOR_STATUS_ACCURACY_MEDIUM;
 					gsensor_data->value_divide = 1000;
 				} else
-					GSE_ERR("gsensor operate function sscanf invaild parameter !\n");
+					GSE_ERR("gsensor invaild para !\n");
 			}
 		}
 		break;
 	default:
-		GSE_ERR("gsensor operate function no this parameter %d!\n", command);
+		GSE_ERR("gsensor no this para %d!\n", command);
 		err = -1;
 		break;
 	}
@@ -1492,9 +1640,6 @@ int gsensor_operate(void *self, uint32_t command, void *buff_in, int size_in,
 	return err;
 }
 #if 0
-/******************************************************************************
- * Function Configuration
-******************************************************************************/
 static int mpu6050_open(struct inode *inode, struct file *file)
 {
 	file->private_data = mpu6050_i2c_client;
@@ -1529,9 +1674,10 @@ static long mpu6050_compat_ioctl(struct file *file, unsigned int cmd,
 			err = -EINVAL;
 			break;
 		}
-		err = file->f_op->unlocked_ioctl(file, GSENSOR_IOCTL_READ_SENSORDATA, (unsigned long)arg32);
+		err = file->f_op->unlocked_ioctl(file,
+			GSENSOR_IOCTL_READ_SENSORDATA, (unsigned long)arg32);
 		if (err) {
-			GSE_ERR("GSENSOR_IOCTL_READ_SENSORDATA unlocked_ioctl failed.");
+			GSE_ERR("GSENSOR_IOCTL_READ_SENSORDATA failed.");
 			return err;
 		}
 		break;
@@ -1541,9 +1687,10 @@ static long mpu6050_compat_ioctl(struct file *file, unsigned int cmd,
 			break;
 		}
 
-		err = file->f_op->unlocked_ioctl(file, GSENSOR_IOCTL_SET_CALI, (unsigned long)arg32);
+		err = file->f_op->unlocked_ioctl(file,
+			GSENSOR_IOCTL_SET_CALI, (unsigned long)arg32);
 		if (err) {
-			GSE_ERR("GSENSOR_IOCTL_SET_CALI unlocked_ioctl failed.");
+			GSE_ERR("GSENSOR_IOCTL_SET_CALI failed.");
 			return err;
 		}
 		break;
@@ -1552,9 +1699,10 @@ static long mpu6050_compat_ioctl(struct file *file, unsigned int cmd,
 			err = -EINVAL;
 			break;
 		}
-		err = file->f_op->unlocked_ioctl(file, GSENSOR_IOCTL_GET_CALI, (unsigned long)arg32);
+		err = file->f_op->unlocked_ioctl(file,
+			GSENSOR_IOCTL_GET_CALI, (unsigned long)arg32);
 		if (err) {
-			GSE_ERR("GSENSOR_IOCTL_GET_CALI unlocked_ioctl failed.");
+			GSE_ERR("GSENSOR_IOCTL_GET_CALI failed.");
 			return err;
 		}
 		break;
@@ -1563,9 +1711,10 @@ static long mpu6050_compat_ioctl(struct file *file, unsigned int cmd,
 			err = -EINVAL;
 			break;
 		}
-		err = file->f_op->unlocked_ioctl(file, GSENSOR_IOCTL_CLR_CALI, (unsigned long)arg32);
+		err = file->f_op->unlocked_ioctl(file,
+			GSENSOR_IOCTL_CLR_CALI, (unsigned long)arg32);
 		if (err) {
-			GSE_ERR("GSENSOR_IOCTL_CLR_CALI unlocked_ioctl failed.");
+			GSE_ERR("GSENSOR_IOCTL_CLR_CALI failed.");
 			return err;
 		}
 		break;
@@ -1579,11 +1728,13 @@ static long mpu6050_compat_ioctl(struct file *file, unsigned int cmd,
 }
 #endif
 
-static long mpu6050_unlocked_ioctl(struct file *file, unsigned int cmd,
-	unsigned long arg)
+static long mpu6050_unlocked_ioctl(struct file *file,
+	unsigned int cmd, unsigned long arg)
 {
-	struct i2c_client *client = (struct i2c_client *)file->private_data;
-	struct mpu6050_i2c_data *obj = (struct mpu6050_i2c_data *)i2c_get_clientdata(client);
+	struct i2c_client *client =
+		(struct i2c_client *)file->private_data;
+	struct mpu6050_i2c_data *obj =
+		(struct mpu6050_i2c_data *)i2c_get_clientdata(client);
 	char strbuf[MPU6050_BUFSIZE];
 	void __user *data;
 	struct SENSOR_DATA sensor_data;
@@ -1591,13 +1742,16 @@ static long mpu6050_unlocked_ioctl(struct file *file, unsigned int cmd,
 	int cali[3];
 
 	if (_IOC_DIR(cmd) & _IOC_READ)
-		err = !access_ok(VERIFY_WRITE, (void __user *)arg, _IOC_SIZE(cmd));
+		err = !access_ok(VERIFY_WRITE, (void __user *)arg,
+			_IOC_SIZE(cmd));
 	else if (_IOC_DIR(cmd) & _IOC_WRITE)
-		err = !access_ok(VERIFY_READ, (void __user *)arg, _IOC_SIZE(cmd));
+		err = !access_ok(VERIFY_READ, (void __user *)arg,
+			_IOC_SIZE(cmd));
 
 
 	if (err) {
-		GSE_ERR("access error: %08X, (%2d, %2d)\n", cmd, _IOC_DIR(cmd), _IOC_SIZE(cmd));
+		GSE_ERR("access error: %08X, (%2d, %2d)\n",
+			cmd, _IOC_DIR(cmd), _IOC_SIZE(cmd));
 		return -EFAULT;
 	}
 
@@ -1613,8 +1767,10 @@ static long mpu6050_unlocked_ioctl(struct file *file, unsigned int cmd,
 			break;
 		}
 
-		MPU6050_ReadChipInfo(client, strbuf, MPU6050_BUFSIZE);
-		if (copy_to_user(data, strbuf, strlen(strbuf) + 1)) {
+		MPU6050_ReadChipInfo(client,
+			strbuf, MPU6050_BUFSIZE);
+		if (copy_to_user(data, strbuf,
+			strlen(strbuf) + 1)) {
 			err = -EFAULT;
 			break;
 		}
@@ -1627,8 +1783,10 @@ static long mpu6050_unlocked_ioctl(struct file *file, unsigned int cmd,
 			break;
 		}
 
-		MPU6050_ReadSensorData(client, strbuf, MPU6050_BUFSIZE);
-		if (copy_to_user(data, strbuf, strlen(strbuf) + 1)) {
+		MPU6050_ReadSensorData(client,
+			strbuf, MPU6050_BUFSIZE);
+		if (copy_to_user(data, strbuf,
+			strlen(strbuf) + 1)) {
 			err = -EFAULT;
 			break;
 		}
@@ -1641,7 +1799,8 @@ static long mpu6050_unlocked_ioctl(struct file *file, unsigned int cmd,
 			break;
 		}
 
-		if (copy_to_user(data, &gsensor_gain, sizeof(struct GSENSOR_VECTOR3D))) {
+		if (copy_to_user(data, &gsensor_gain,
+			sizeof(struct GSENSOR_VECTOR3D))) {
 			err = -EFAULT;
 			break;
 		}
@@ -1658,7 +1817,8 @@ static long mpu6050_unlocked_ioctl(struct file *file, unsigned int cmd,
 			err = -EINVAL;
 		} else {
 			MPU6050_ReadRawData(client, strbuf);
-			if (copy_to_user(data, strbuf, strlen(strbuf) + 1)) {
+			if (copy_to_user(data, strbuf,
+				strlen(strbuf) + 1)) {
 				err = -EFAULT;
 				break;
 			}
@@ -1671,7 +1831,8 @@ static long mpu6050_unlocked_ioctl(struct file *file, unsigned int cmd,
 			err = -EINVAL;
 			break;
 		}
-		if (copy_from_user(&sensor_data, data, sizeof(sensor_data))) {
+		if (copy_from_user(&sensor_data, data,
+			sizeof(sensor_data))) {
 			err = -EFAULT;
 			break;
 		}
@@ -1679,9 +1840,15 @@ static long mpu6050_unlocked_ioctl(struct file *file, unsigned int cmd,
 			GSE_ERR("Perform calibration in suspend state!!\n");
 			err = -EINVAL;
 		} else {
-			cali[MPU6050_AXIS_X] = sensor_data.x * obj->reso->sensitivity / GRAVITY_EARTH_1000;
-			cali[MPU6050_AXIS_Y] = sensor_data.y * obj->reso->sensitivity / GRAVITY_EARTH_1000;
-			cali[MPU6050_AXIS_Z] = sensor_data.z * obj->reso->sensitivity / GRAVITY_EARTH_1000;
+			cali[MPU6050_AXIS_X] =
+				sensor_data.x * obj->reso->sensitivity /
+				GRAVITY_EARTH_1000;
+			cali[MPU6050_AXIS_Y] =
+				sensor_data.y * obj->reso->sensitivity /
+				GRAVITY_EARTH_1000;
+			cali[MPU6050_AXIS_Z] =
+				sensor_data.z * obj->reso->sensitivity /
+				GRAVITY_EARTH_1000;
 			err = MPU6050_WriteCalibration(client, cali);
 		}
 		break;
@@ -1700,10 +1867,17 @@ static long mpu6050_unlocked_ioctl(struct file *file, unsigned int cmd,
 		if (err)
 			break;
 
-		sensor_data.x = cali[MPU6050_AXIS_X] * GRAVITY_EARTH_1000 / obj->reso->sensitivity;
-		sensor_data.y = cali[MPU6050_AXIS_Y] * GRAVITY_EARTH_1000 / obj->reso->sensitivity;
-		sensor_data.z = cali[MPU6050_AXIS_Z] * GRAVITY_EARTH_1000 / obj->reso->sensitivity;
-		if (copy_to_user(data, &sensor_data, sizeof(sensor_data))) {
+		sensor_data.x =
+			cali[MPU6050_AXIS_X] * GRAVITY_EARTH_1000 /
+			obj->reso->sensitivity;
+		sensor_data.y =
+			cali[MPU6050_AXIS_Y] * GRAVITY_EARTH_1000 /
+			obj->reso->sensitivity;
+		sensor_data.z =
+			cali[MPU6050_AXIS_Z] * GRAVITY_EARTH_1000 /
+			obj->reso->sensitivity;
+		if (copy_to_user(data, &sensor_data,
+			sizeof(sensor_data))) {
 			err = -EFAULT;
 			break;
 		}
@@ -1795,7 +1969,8 @@ static int mpu6050_resume(struct device *dev)
 /*----------------------------------------------------------------------------*/
 static void mpu6050_early_suspend(struct early_suspend *h)
 {
-	struct mpu6050_i2c_data *obj = container_of(h, struct mpu6050_i2c_data, early_drv);
+	struct mpu6050_i2c_data *obj = container_of(h,
+		struct mpu6050_i2c_data, early_drv);
 	int err;
 
 	GSE_FUN();
@@ -1826,7 +2001,8 @@ static void mpu6050_early_suspend(struct early_suspend *h)
 /*----------------------------------------------------------------------------*/
 static void mpu6050_late_resume(struct early_suspend *h)
 {
-	struct mpu6050_i2c_data *obj = container_of(h, struct mpu6050_i2c_data, early_drv);
+	struct mpu6050_i2c_data *obj = container_of(h,
+		struct mpu6050_i2c_data, early_drv);
 	int err;
 
 	GSE_FUN();
@@ -1846,7 +2022,8 @@ static void mpu6050_late_resume(struct early_suspend *h)
 /*----------------------------------------------------------------------------*/
 #endif				/*CONFIG_HAS_EARLYSUSPEND */
 /*----------------------------------------------------------------------------*/
-static int mpu6050_i2c_detect(struct i2c_client *client, struct i2c_board_info *info)
+static int mpu6050_i2c_detect(struct i2c_client *client,
+	struct i2c_board_info *info)
 {
 	strcpy(info->type, MPU6050_DEV_NAME);
 	return 0;
@@ -1854,14 +2031,23 @@ static int mpu6050_i2c_detect(struct i2c_client *client, struct i2c_board_info *
 
 
 
-/* if use  this typ of enable , Gsensor should report inputEvent(x, y, z ,stats, div) to HAL*/
+/*
+ * if use  this type of enable ,
+ * Gsensor should report inputEvent(x, y, z ,stats, div) to HAL
+ */
 static int gsensor_open_report_data(int open)
 {
-	/*should queuq work to report event if  is_report_input_direct=true*/
+	/*
+	 * should queuq work to report event
+	 * if  is_report_input_direct=true
+	 */
 	return 0;
 }
 
-/* if use  this typ of enable , Gsensor only enabled but not report inputEvent to HAL*/
+/*
+ * if use  this type of enable ,
+ * Gsensor only enabled but not report inputEvent to HAL
+ */
 
 static int gsensor_enable_nodata(int en)
 {
@@ -1910,7 +2096,8 @@ static int gsensor_set_delay(u64 ns)
 	GSE_LOG("mpu6050_set_delay (%d)\n", value);
 	return 0;
 }
-static int gsensor_batch(int flag, int64_t samplingPeriodNs, int64_t maxBatchReportLatencyNs)
+static int gsensor_batch(int flag, int64_t samplingPeriodNs,
+	int64_t maxBatchReportLatencyNs)
 {
 	int value = 0;
 
@@ -1929,18 +2116,20 @@ static int gsensor_get_data(int *x, int *y, int *z, int *status)
 	char buff[MPU6050_BUFSIZE];
 	int err;
 
-	MPU6050_ReadSensorData(obj_i2c_data->client, buff, MPU6050_BUFSIZE);
+	MPU6050_ReadSensorData(obj_i2c_data->client,
+		buff, MPU6050_BUFSIZE);
 	err = sscanf(buff, "%x %x %x", x, y, z);
 	if (err == 3)
 		*status = SENSOR_STATUS_ACCURACY_MEDIUM;
 	else
-		GSE_ERR("gsensor operate function sscanf invaild parameter !\n");
+		GSE_ERR("gsensor invaild para!\n");
 
 	return 0;
 }
 
 /*----------------------------------------------------------------------------*/
-static int mpu6050_factory_enable_sensor(bool enabledisable, int64_t sample_periods_ms)
+static int mpu6050_factory_enable_sensor(bool enabledisable,
+	int64_t sample_periods_ms)
 {
 	int err;
 #if 0
@@ -2043,9 +2232,12 @@ static int mpu6050_factory_get_cali(int32_t data[3])
 		GSE_ERR("mpu6050a_ReadCalibration failed!\n");
 		return -1;
 	}
-	data[0] = cali[MPU6050_AXIS_X] * GRAVITY_EARTH_1000 / obj->reso->sensitivity;
-	data[1] = cali[MPU6050_AXIS_Y] * GRAVITY_EARTH_1000 / obj->reso->sensitivity;
-	data[2] = cali[MPU6050_AXIS_Z] * GRAVITY_EARTH_1000 / obj->reso->sensitivity;
+	data[0] = cali[MPU6050_AXIS_X] * GRAVITY_EARTH_1000 /
+		obj->reso->sensitivity;
+	data[1] = cali[MPU6050_AXIS_Y] * GRAVITY_EARTH_1000 /
+		obj->reso->sensitivity;
+	data[2] = cali[MPU6050_AXIS_Z] * GRAVITY_EARTH_1000 /
+		obj->reso->sensitivity;
 	return 0;
 }
 static int mpu6050_factory_do_self_test(void)
@@ -2070,7 +2262,8 @@ static struct accel_factory_public mpu6050a_factory_device = {
 	.fops = &mpu6050a_factory_fops,
 };
 /*----------------------------------------------------------------------------*/
-static int mpu6050_i2c_probe(struct i2c_client *client, const struct i2c_device_id *id)
+static int mpu6050_i2c_probe(struct i2c_client *client,
+	const struct i2c_device_id *id)
 {
 	struct i2c_client *new_client = NULL;
 	struct mpu6050_i2c_data *obj = NULL;
@@ -2136,7 +2329,8 @@ static int mpu6050_i2c_probe(struct i2c_client *client, const struct i2c_device_
 	}
 
 
-	err = mpu6050_create_attr(&(mpu6050_init_info.platform_diver_addr->driver));
+	err = mpu6050_create_attr(
+		&(mpu6050_init_info.platform_diver_addr->driver));
 	if (err) {
 		GSE_ERR("create attribute err = %d\n", err);
 		goto exit_create_attr_failed;
@@ -2166,7 +2360,8 @@ static int mpu6050_i2c_probe(struct i2c_client *client, const struct i2c_device_
 #ifdef USE_EARLY_SUSPEND
 	obj->early_drv.level = EARLY_SUSPEND_LEVEL_STOP_DRAWING - 2,
 	obj->early_drv.suspend = mpu6050_early_suspend,
-	obj->early_drv.resume = mpu6050_late_resume, register_early_suspend(&obj->early_drv);
+	obj->early_drv.resume = mpu6050_late_resume,
+	register_early_suspend(&obj->early_drv);
 #endif
 
 	gsensor_init_flag = 0;
@@ -2195,7 +2390,8 @@ static int mpu6050_i2c_remove(struct i2c_client *client)
 {
 	int err = 0;
 
-	err =  mpu6050_delete_attr(&(mpu6050_init_info.platform_diver_addr->driver));
+	err =  mpu6050_delete_attr(
+		&(mpu6050_init_info.platform_diver_addr->driver));
 	if (err)
 		GSE_ERR("mpu6050_delete_attr fail: %d\n", err);
 

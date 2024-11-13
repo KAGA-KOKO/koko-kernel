@@ -25,7 +25,7 @@ static struct fusion_context *fusion_context_alloc_object(void)
 	int index = 0;
 	struct fusion_context *obj = kzalloc(sizeof(*obj), GFP_KERNEL);
 
-	pr_debug("fusion_context_alloc_object++++\n");
+	pr_debug("%s start\n", __func__);
 	if (!obj) {
 		pr_err("Alloc fusion object error!\n");
 		return NULL;
@@ -40,7 +40,7 @@ static struct fusion_context *fusion_context_alloc_object(void)
 		obj->fusion_context[index].delay_ns = -1;
 		obj->fusion_context[index].latency_ns = -1;
 	}
-	pr_debug("fusion_context_alloc_object----\n");
+	pr_debug("%s end\n", __func__);
 	return obj;
 }
 
@@ -83,16 +83,16 @@ static int handle_to_index(int handle)
 		index = ungyro_temperature;
 		break;
 #ifdef VENDOR_EDIT
-/*QZL@PSW.BSP.Sensor, 2018/12/24, Add for oppo algo*/
-        case ID_FFD:
-            index = ffd;
-            break;
-        case ID_FREE_FALL:
-            index = free_fall;
-            break;
-        case ID_PICKUP_MOTION:
-            index = pickup_motion;
-            break;
+/*tangjh@PSW.BSP.Sensor, 2019/7/1, Add for oppo algo*/
+	case ID_FFD:
+		index = ffd;
+		break;
+	case ID_FREE_FALL:
+		index = free_fall;
+		break;
+	case ID_PICKUP_MOTION:
+		index = pickup_motion;
+		break;
         case ID_ACTION_DETECT:
             index = action_detect;
             break;
@@ -100,10 +100,9 @@ static int handle_to_index(int handle)
             index = lux_aod;
             break;
 #endif /*VENDOR_EDIT*/
-
 	default:
 		index = -1;
-		pr_err("handle_to_index invalid handle:%d, index:%d\n",
+		pr_err("%s invalid handle:%d, index:%d\n", __func__,
 			handle, index);
 		return index;
 	}
@@ -172,11 +171,10 @@ static ssize_t fusion_store_active(struct device *dev,
 
 	err = sscanf(buf, "%d,%d", &handle, &en);
 	if (err < 0) {
-		pr_err("fusion_store_active param error: err = %d\n",
-			err);
+		pr_err("%s param error: err = %d\n", __func__, err);
 		return err;
 	}
-	pr_debug("fusion_store_active handle=%d, en=%d\n", handle, en);
+	pr_debug("%s handle=%d, en=%d\n", __func__, handle, en);
 	index = handle_to_index(handle);
 	if (index < 0) {
 		pr_err("[%s] invalid handle\n", __func__);
@@ -194,7 +192,7 @@ static ssize_t fusion_store_active(struct device *dev,
 	else if (en == 0)
 		cxt->fusion_context[index].enable = 0;
 	else {
-		pr_err(" fusion_store_active error !!\n");
+		pr_err("%s error !!\n", __func__);
 		err = -1;
 		goto err_out;
 	}
@@ -260,8 +258,7 @@ static ssize_t fusion_store_batch(struct device *dev,
 	err = sscanf(buf, "%d,%d,%lld,%lld",
 		&handle, &flag, &samplingPeriodNs, &maxBatchReportLatencyNs);
 	if (err != 4) {
-		pr_err("fusion_store_batch param error: err = %d\n",
-			err);
+		pr_err("%s param error: err = %d\n", __func__, err);
 		return err;
 	}
 	index = handle_to_index(handle);
@@ -320,10 +317,9 @@ static ssize_t fusion_store_flush(struct device *dev,
 
 	err = kstrtoint(buf, 10, &handle);
 	if (err != 0)
-		pr_err("fusion_store_flush param error: err = %d\n",
-			err);
+		pr_err("%s param error: err = %d\n", __func__, err);
 
-	pr_debug("fusion_store_flush param: handle %d\n", handle);
+	pr_debug("%s param: handle %d\n", __func__, handle);
 
 	mutex_lock(&fusion_context_obj->fusion_op_mutex);
 	cxt = fusion_context_obj;
@@ -353,7 +349,7 @@ static int fusion_real_driver_init(void)
 	int index = 0;
 	int err = -1;
 
-	pr_debug("fusion_real_driver_init +\n");
+	pr_debug("%s start\n", __func__);
 	for (index = 0; index < max_fusion_support; index++) {
 		pr_debug("index = %d\n", index);
 		if (fusion_init_list[index] != NULL) {
@@ -474,6 +470,7 @@ int fusion_register_control_path(struct fusion_control_path *ctl,
 		return -1;
 	}
 
+	pr_err("[%s] handle = %d, index = %d\n", __func__, handle, index);
 	cxt = fusion_context_obj;
 	cxt->fusion_context[index].fusion_ctl.set_delay =
 		ctl->set_delay;
@@ -487,16 +484,7 @@ int fusion_register_control_path(struct fusion_control_path *ctl,
 		ctl->is_support_batch;
 	cxt->fusion_context[index].fusion_ctl.is_report_input_direct =
 		ctl->is_report_input_direct;
-        #ifdef VENDOR_EDIT
-        cxt->fusion_context[index].fusion_ctl.is_support_wake_lock =
-		ctl->is_support_wake_lock;
-        cxt->wake_lock_name[index] = kzalloc(64, GFP_KERNEL);
-        if (!cxt->wake_lock_name[index])
-	    return -1;
-        sprintf(cxt->wake_lock_name[index], "fusion_wakelock-%d", index);
-        wakeup_source_init(&cxt->ws[index], cxt->wake_lock_name[index]);
-        #endif	
-        return 0;
+	return 0;
 }
 
 static int fusion_data_report(int x, int y, int z,
@@ -505,11 +493,8 @@ static int fusion_data_report(int x, int y, int z,
 	/* pr_debug("+fusion_data_report! %d, %d, %d, %d\n",x,y,z,status); */
 	struct sensor_event event;
 	int err = 0;
-        int index = -1;
-	struct fusion_context *cxt = NULL;
-	cxt = fusion_context_obj;
 
-        memset(&event, 0, sizeof(struct sensor_event));
+	memset(&event, 0, sizeof(struct sensor_event));
 
 	event.handle = handle;
 	event.flush_action = DATA_ACTION;
@@ -519,21 +504,8 @@ static int fusion_data_report(int x, int y, int z,
 	event.word[1] = y;
 	event.word[2] = z;
 	event.word[3] = scalar;
-        #ifdef VENDOR_EDIT
-	index = handle_to_index(handle);
-	if (index < 0) {
-		pr_err("[%s] invalid handle\n", __func__);
-		return -1;
-	}
-        #endif
+
 	err = sensor_input_event(fusion_context_obj->mdev.minor, &event);
-        #ifdef VENDOR_EDIT
-        if (cxt->fusion_context[index].fusion_ctl.open_report_data != NULL &&
-		cxt->fusion_context[index].fusion_ctl.is_support_wake_lock){
-          pr_err("wake_lock index=%d\n",index);
-          __pm_wakeup_event(&cxt->ws[index], 250);
-        }
-        #endif 
 	return err;
 }
 
@@ -655,7 +627,10 @@ int uncali_gyro_temperature_data_report(int *data, int status, int64_t nt)
 {
 	return uncali_sensor_data_report(data, status, nt, ID_GYRO_TEMPERATURE);
 }
-
+int uncali_gyro_temperature_flush_report(void)
+{
+	return uncali_sensor_flush_report(ID_GYRO_TEMPERATURE);
+}
 int uncali_gyro_flush_report(void)
 {
 	return uncali_sensor_flush_report(ID_GYROSCOPE_UNCALIBRATED);
@@ -672,7 +647,7 @@ int uncali_mag_flush_report(void)
 }
 
 #ifdef VENDOR_EDIT
-/*QZL@PSW.BSP.Sensor, 2018/12/24, Add for oppo algo*/
+/*tangjh@PSW.BSP.Sensor, 2019/7/1, Add for oppo algo*/
 int ffd_data_report(int x, int y, int64_t nt)
 {
 	return fusion_data_report(x, y, 0, 0, 0, nt, ID_FFD);
@@ -693,7 +668,6 @@ int free_fall_flush_report(void)
 
 int pickup_motion_data_report(int x, int y, int64_t nt)
 {
-        pr_err("pickup_motion_data_report:x=%d,y=%d\n",x,y);
 	return fusion_data_report(x, y, 0, 0, 0, nt, ID_PICKUP_MOTION);
 }
 int pickup_motion_flush_report(void)
@@ -727,7 +701,7 @@ static int fusion_probe(void)
 
 	int err;
 
-	pr_debug("+++++++++++++fusion_probe!!\n");
+	pr_debug("%s+++!!\n", __func__);
 
 	fusion_context_obj = fusion_context_alloc_object();
 	if (!fusion_context_obj) {
@@ -755,17 +729,15 @@ static int fusion_probe(void)
 	}
 	kobject_uevent(&fusion_context_obj->mdev.this_device->kobj, KOBJ_ADD);
 
-	pr_debug("----fusion_probe OK !!\n");
+	pr_debug("%s--- OK !!\n", __func__);
 	return 0;
 
 real_driver_init_fail:
 	kfree(fusion_context_obj);
 exit_alloc_data_failed:
-	pr_debug("----fusion_probe fail !!!\n");
+	pr_debug("%s---- fail !!!\n", __func__);
 	return err;
 }
-
-
 
 static int fusion_remove(void)
 {

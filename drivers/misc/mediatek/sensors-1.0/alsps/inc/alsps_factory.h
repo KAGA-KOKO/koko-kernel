@@ -50,10 +50,7 @@ struct alsps_factory_fops {
 #ifdef VENDOR_EDIT
 /*zhq@PSW.BSP.Sensor, 2018/10/28, Add for als ps cail*/
 	int (*als_get_cali)(int32_t offset[6]);
-#else
-	int (*als_get_cali)(int32_t *offset);	
 #endif /* VENDOR_EDIT */
-
 
 	int (*ps_enable_sensor)(bool enable_disable, int64_t sample_periods_ms);
 	int (*ps_get_data)(int32_t *data);
@@ -64,17 +61,9 @@ struct alsps_factory_fops {
 /*zhq@PSW.BSP.Sensor, 2018/10/28, Add for als ps cail*/
 	int (*ps_set_cali)(int32_t offset[6]);
 	int (*ps_get_cali)(int32_t offset[6]);
-#else
-	int (*ps_set_cali)(int32_t offset);
-	int (*ps_get_cali)(int32_t *offset);	
 #endif /* VENDOR_EDIT */
-
 	int (*ps_set_threshold)(int32_t threshold[2]);
 	int (*ps_get_threshold)(int32_t threshold[2]);
-#ifdef VENDOR_EDIT
-/* Weiqin.Tang@PSW.BSP.Sensor, 2020/1/2, add for set factory flag to scp */
-	int (*ps_set_factory_flag)(int32_t flag);
-#endif
 };
 
 struct alsps_factory_public {

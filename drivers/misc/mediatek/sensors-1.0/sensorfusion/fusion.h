@@ -57,7 +57,7 @@ enum fusion_handle {
 	pdr,
 	ungyro_temperature,
 #ifdef VENDOR_EDIT
-/*QZL@PSW.BSP.Sensor, 2018/12/24, Add for oppo algo*/
+/*tangjh@PSW.BSP.Sensor, 2019/7/1, Add for oppo algo*/
 	ffd,
 	free_fall,
 	pickup_motion,
@@ -77,9 +77,6 @@ struct fusion_control_path {
 	int (*access_data_fifo)(void);/* version2.used for flush operate */
 	bool is_report_input_direct;
 	bool is_support_batch;/* version2.used for batch mode support flag */
-        #ifdef VENDOR_EDIT
-        bool is_support_wake_lock;
-        #endif
 	int (*fusion_calibration)(int type, int cali[3]);/* v3  factory API1 */
 };
 
@@ -128,11 +125,7 @@ struct fusion_context {
 	struct mutex fusion_op_mutex;
 	atomic_t trace;
 	struct fusion_control_context fusion_context[max_fusion_support];
-        #ifdef VENDOR_EDIT
-        struct wakeup_source ws[max_fusion_support];
-	char *wake_lock_name[max_fusion_support];
-        #endif
-        /* struct fusion_drv_obj    drv_obj; */
+	/* struct fusion_drv_obj    drv_obj; */
 };
 
 /* driver API for internal */
@@ -168,11 +161,12 @@ int uncali_acc_flush_report(void);
 int uncali_gyro_data_report(int *data, int status, int64_t nt);
 int uncali_gyro_temperature_data_report(int *data,
 	int status, int64_t nt);
+int uncali_gyro_temperature_flush_report(void);
 int uncali_gyro_flush_report(void);
 int uncali_mag_data_report(int *data, int status, int64_t nt);
 int uncali_mag_flush_report(void);
 #ifdef VENDOR_EDIT
-/*QZL@PSW.BSP.Sensor, 2018/12/24, Add for oppo algo*/
+/*tangjh@PSW.BSP.Sensor, 2019/7/1, Add for oppo algo*/
 extern int ffd_data_report(int x, int y, int64_t nt);
 extern int ffd_flush_report(void);
 
@@ -190,5 +184,4 @@ extern int lux_aod_flush_report(void);
 
 
 #endif /*VENDOR_EDIT*/
-
 #endif

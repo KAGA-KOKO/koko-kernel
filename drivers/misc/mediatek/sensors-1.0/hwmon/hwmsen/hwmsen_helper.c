@@ -315,7 +315,7 @@ void hwmsen_single_rw(struct i2c_client *client, struct hwmsen_reg *regs,
 		}
 	}
 	if (!err)
-		pr_debug("hwmsen_single_rw pass!!\n");
+		pr_debug("%s pass!!\n", __func__);
 }
 /*----------------------------------------------------------------------------*/
 EXPORT_SYMBOL_GPL(hwmsen_single_rw);

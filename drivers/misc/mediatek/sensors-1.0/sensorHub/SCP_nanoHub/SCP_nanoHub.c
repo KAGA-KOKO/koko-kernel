@@ -47,6 +47,8 @@
 #include "SCP_power_monitor.h"
 #include <asm/arch_timer.h>
 #include <linux/math64.h>
+#include <uapi/linux/sched/types.h>
+
 
 /* ALGIN TO SCP SENSOR_IPI_SIZE AT FILE CONTEXTHUB_FW.H, ALGIN
  * TO SCP_SENSOR_HUB_DATA UNION, ALGIN TO STRUCT DATA_UNIT_T
@@ -105,6 +107,7 @@ struct SCP_sensorHub_data {
 };
 static struct SensorState mSensorState[SENSOR_TYPE_MAX_NUM_PLUS_ONE];
 static DEFINE_MUTEX(mSensorState_mtx);
+static DEFINE_MUTEX(flush_mtx);
 static atomic_t power_status = ATOMIC_INIT(SENSOR_POWER_DOWN);
 static DECLARE_WAIT_QUEUE_HEAD(chre_kthread_wait);
 static DECLARE_WAIT_QUEUE_HEAD(power_reset_wait);
@@ -167,19 +170,19 @@ static inline uint64_t arch_counter_to_ns(uint64_t cyc)
 #define FILTER_FREQ			10000000ULL /* 10 ms */
 struct moving_average {
 	uint64_t last_time;
-	uint64_t input[FILTER_DATAPOINTS];
-	uint64_t output;
+	int64_t input[FILTER_DATAPOINTS];
+	atomic64_t output;
 	uint8_t cnt;
 	uint8_t tail;
 };
 static struct moving_average moving_average_algo;
 static uint8_t rtc_compensation_suspend;
 static void moving_average_filter(struct moving_average *filter,
-	uint64_t ap_time, uint64_t hub_time)
+		uint64_t ap_time, uint64_t hub_time)
 {
 	int i = 0;
-	int32_t avg;
-	uint64_t ret_avg = 0;
+	int64_t avg = 0;
+	int64_t ret_avg = 0;
 
 	if (ap_time > filter->last_time + FILTER_TIMEOUT ||
 		filter->last_time == 0) {
@@ -198,19 +201,19 @@ static void moving_average_filter(struct moving_average *filter,
 	/* pr_err("hongxu raw_offset=%lld\n", ap_time - hub_time); */
 
 	for (i = 1, avg = 0; i < filter->cnt; i++)
-		avg += (int32_t)(filter->input[i] - filter->input[0]);
-	ret_avg = (avg / filter->cnt) + filter->input[0];
-	WRITE_ONCE(filter->output, ret_avg);
+		avg += (filter->input[i] - filter->input[0]);
+	ret_avg = div_s64(avg, filter->cnt) + filter->input[0];
+	atomic64_set(&filter->output, ret_avg);
 }
 
 static uint64_t get_filter_output(struct moving_average *filter)
 {
-	return READ_ONCE(filter->output);
+	return atomic64_read(&filter->output);
 }
 
 struct SCP_sensorHub_Cmd {
 	uint32_t reason;
-	void (*handler)(SCP_SENSOR_HUB_DATA_P rsp, int rx_len);
+	void (*handler)(union SCP_SENSOR_HUB_DATA *rsp, int rx_len);
 };
 
 #define SCP_SENSORHUB_CMD(_reason, _handler) \
@@ -271,7 +274,8 @@ static int ipi_txrx_bufs(struct ipi_transfer *t)
 	unsigned long flags;
 	struct scp_send_ipi *hw = &txrx_cmd;
 
-	/* SCP_SENSOR_HUB_DATA_P req = (SCP_SENSOR_HUB_DATA_P)t->tx_buf;
+	/* union SCP_SENSOR_HUB_DATA *req =
+	 *		(union SCP_SENSOR_HUB_DATA *)t->tx_buf;
 	 * pr_err("sensorType:%d, action:%d\n",
 	 *req->req.sensorType, req->req.action);
 	 */
@@ -423,7 +427,7 @@ static int SCP_sensorHub_ipi_master_init(void)
 	return 0;
 }
 
-int scp_sensorHub_req_send(SCP_SENSOR_HUB_DATA_P data,
+int scp_sensorHub_req_send(union SCP_SENSOR_HUB_DATA *data,
 	uint *len, unsigned int wait)
 {
 	int ret = 0;
@@ -471,7 +475,8 @@ int scp_sensorHub_data_registration(uint8_t sensor,
 
 	return 0;
 }
-static void SCP_sensorHub_write_wp_queue(SCP_SENSOR_HUB_DATA_P rsp)
+
+static void SCP_sensorHub_write_wp_queue(union SCP_SENSOR_HUB_DATA *rsp)
 {
 	struct SCP_sensorHub_data *obj = obj_data;
 	struct curr_wp_queue *wp_queue = &obj->wp_queue;
@@ -540,10 +545,11 @@ static int SCP_sensorHub_direct_push_work(void *data)
 	}
 	return 0;
 }
-static void SCP_sensorHub_xcmd_putdata(SCP_SENSOR_HUB_DATA_P rsp,
+
+static void SCP_sensorHub_xcmd_putdata(union SCP_SENSOR_HUB_DATA *rsp,
 			int rx_len)
 {
-	SCP_SENSOR_HUB_DATA_P req;
+	union SCP_SENSOR_HUB_DATA *req;
 	struct scp_send_ipi *hw = &txrx_cmd;
 
 	spin_lock(&txrx_cmd_lock);
@@ -552,7 +558,7 @@ static void SCP_sensorHub_xcmd_putdata(SCP_SENSOR_HUB_DATA_P rsp,
 		goto out;
 	}
 
-	req = (SCP_SENSOR_HUB_DATA_P)hw->tx;
+	req = (union SCP_SENSOR_HUB_DATA *)hw->tx;
 
 	if (req->req.sensorType != rsp->rsp.sensorType ||
 		req->req.action != rsp->rsp.action) {
@@ -567,49 +573,50 @@ static void SCP_sensorHub_xcmd_putdata(SCP_SENSOR_HUB_DATA_P rsp,
 out:
 	spin_unlock(&txrx_cmd_lock);
 }
-static void SCP_sensorHub_enable_cmd(SCP_SENSOR_HUB_DATA_P rsp,
+
+static void SCP_sensorHub_enable_cmd(union SCP_SENSOR_HUB_DATA *rsp,
 					int rx_len)
 {
 	SCP_sensorHub_xcmd_putdata(rsp, rx_len);
 }
-static void SCP_sensorHub_set_delay_cmd(SCP_SENSOR_HUB_DATA_P rsp,
+static void SCP_sensorHub_set_delay_cmd(union SCP_SENSOR_HUB_DATA *rsp,
 						int rx_len)
 {
 	SCP_sensorHub_xcmd_putdata(rsp, rx_len);
 }
-static void SCP_sensorHub_get_data_cmd(SCP_SENSOR_HUB_DATA_P rsp,
+static void SCP_sensorHub_get_data_cmd(union SCP_SENSOR_HUB_DATA *rsp,
 						int rx_len)
 {
 	SCP_sensorHub_xcmd_putdata(rsp, rx_len);
 }
-static void SCP_sensorHub_batch_cmd(SCP_SENSOR_HUB_DATA_P rsp,
+static void SCP_sensorHub_batch_cmd(union SCP_SENSOR_HUB_DATA *rsp,
 					int rx_len)
 {
 	SCP_sensorHub_xcmd_putdata(rsp, rx_len);
 }
-static void SCP_sensorHub_set_cfg_cmd(SCP_SENSOR_HUB_DATA_P rsp,
+static void SCP_sensorHub_set_cfg_cmd(union SCP_SENSOR_HUB_DATA *rsp,
 					int rx_len)
 {
 	SCP_sensorHub_xcmd_putdata(rsp, rx_len);
 }
-static void SCP_sensorHub_set_cust_cmd(SCP_SENSOR_HUB_DATA_P rsp,
+static void SCP_sensorHub_set_cust_cmd(union SCP_SENSOR_HUB_DATA *rsp,
 						int rx_len)
 {
 	SCP_sensorHub_xcmd_putdata(rsp, rx_len);
 }
 static void
-SCP_sensorHub_batch_timeout_cmd(SCP_SENSOR_HUB_DATA_P rsp,
+SCP_sensorHub_batch_timeout_cmd(union SCP_SENSOR_HUB_DATA *rsp,
 					int rx_len)
 {
 	SCP_sensorHub_xcmd_putdata(rsp, rx_len);
 }
 static void
-SCP_sensorHub_set_timestamp_cmd(SCP_SENSOR_HUB_DATA_P rsp,
+SCP_sensorHub_set_timestamp_cmd(union SCP_SENSOR_HUB_DATA *rsp,
 					int rx_len)
 {
 	SCP_sensorHub_xcmd_putdata(rsp, rx_len);
 }
-static void SCP_sensorHub_moving_average(SCP_SENSOR_HUB_DATA_P rsp)
+static void SCP_sensorHub_moving_average(union SCP_SENSOR_HUB_DATA *rsp)
 {
 	uint64_t ap_now_time = 0, arch_counter = 0;
 	uint64_t scp_raw_time = 0, scp_now_time = 0;
@@ -627,7 +634,7 @@ static void SCP_sensorHub_moving_average(SCP_SENSOR_HUB_DATA_P rsp)
 	scp_now_time = scp_raw_time + ipi_transfer_time;
 	moving_average_filter(&moving_average_algo, ap_now_time, scp_now_time);
 }
-static void SCP_sensorHub_notify_cmd(SCP_SENSOR_HUB_DATA_P rsp,
+static void SCP_sensorHub_notify_cmd(union SCP_SENSOR_HUB_DATA *rsp,
 	int rx_len)
 {
 	/* struct SCP_sensorHub_data *obj = obj_data; */
@@ -728,11 +735,11 @@ const struct SCP_sensorHub_Cmd *
 static void SCP_sensorHub_IPI_handler(int id,
 	void *data, unsigned int len)
 {
-	SCP_SENSOR_HUB_DATA_P rsp = (SCP_SENSOR_HUB_DATA_P) data;
+	union SCP_SENSOR_HUB_DATA *rsp = (union SCP_SENSOR_HUB_DATA *) data;
 	const struct SCP_sensorHub_Cmd *cmd;
 
 	if (len > SENSOR_IPI_SIZE) {
-		pr_err("SCP_sensorHub_IPI_handler len=%d error\n", len);
+		pr_err("%s len=%d error\n", __func__, len);
 		return;
 	}
 	/*pr_err("sensorType:%d, action=%d event:%d len:%d\n",
@@ -904,7 +911,7 @@ static void SCP_sensorHub_init_sensor_state(void)
 	mSensorState[SENSOR_TYPE_SAR].timestamp_filter = false;
 
 #ifdef VENDOR_EDIT
-/*QZL@PSW.BSP.Sensor, 2018/12/24, Add for oppo algo*/
+/*tangjh@PSW.BSP.Sensor, 2019/6/29, Add for oppo algo*/
 	mSensorState[SENSOR_TYPE_FFD].sensorType = SENSOR_TYPE_FFD;
 	mSensorState[SENSOR_TYPE_FFD].rate = SENSOR_RATE_ONCHANGE;
 	mSensorState[SENSOR_TYPE_FFD].timestamp_filter = false;
@@ -1006,16 +1013,29 @@ static int SCP_sensorHub_flush(int handle)
 	uint8_t sensor_type = handle + ID_OFFSET;
 	struct ConfigCmd cmd;
 	int ret = 0;
+	atomic_t *p_flush_count = NULL;
 
 	if (mSensorState[sensor_type].sensorType) {
-		atomic_inc(&mSensorState[sensor_type].flushCnt);
 		init_sensor_config_cmd(&cmd, sensor_type);
 		cmd.cmd = CONFIG_CMD_FLUSH;
+		/*
+		 * add count must before flush, if we add count after
+		 * flush right return and flush callback directly report
+		 * flush will lose flush complete
+		 */
+		p_flush_count = &mSensorState[sensor_type].flushCnt;
+		mutex_lock(&flush_mtx);
+		atomic_inc(p_flush_count);
+		mutex_unlock(&flush_mtx);
 		if (atomic_read(&power_status) == SENSOR_POWER_UP) {
 			ret = nanohub_external_write((const uint8_t *)&cmd,
 				sizeof(struct ConfigCmd));
 			if (ret < 0) {
 				pr_err("failed flush handle:%d\n", handle);
+				mutex_lock(&flush_mtx);
+				if (atomic_read(p_flush_count) > 0)
+					atomic_dec(p_flush_count);
+				mutex_unlock(&flush_mtx);
 				return -1;
 			}
 		}
@@ -1026,102 +1046,113 @@ static int SCP_sensorHub_flush(int handle)
 	return 0;
 }
 
-static int SCP_sensorHub_report_data(struct data_unit_t *data_t)
+static int SCP_sensorHub_report_raw_data(struct data_unit_t *data_t)
 {
 	struct SCP_sensorHub_data *obj = obj_data;
-	int err = 0, sensor_type = 0, sensor_id = 0, alt_id;
-	int64_t timestamp_ms = 0;
-	static int64_t last_timestamp_ms[ID_SENSOR_MAX_HANDLE_PLUS_ONE];
-	uint8_t alt = 0;
+	int err = 0, sensor_type = 0, sensor_id = 0;
 	atomic_t *p_flush_count = NULL;
-	bool raw_enable = 0, alt_enable = 0;
-	bool need_send = false;
-	/* int64_t now_enter_timestamp = 0;
-	 * now_enter_timestamp = ktime_get_boot_ns();
-	 * pr_err("type:%d,now time:%lld, scp time: %lld\n",
-	 * data_t->sensor_type, now_enter_timestamp,
-	 * data_t->time_stamp);
-	 */
+	bool raw_enable = 0;
+	int64_t raw_enable_time = 0;
+
 	sensor_id = data_t->sensor_type;
 	sensor_type = sensor_id + ID_OFFSET;
-	data_t->time_stamp += get_filter_output(&moving_average_algo);
-	/*
-	 * pr_debug("compensation_offset=%lld\n",
-	 * get_filter_output(&moving_average_algo));
-	 */
-	alt = READ_ONCE(mSensorState[sensor_type].alt);
-	alt_id = alt - ID_OFFSET;
-	if (!alt) {
-		raw_enable = READ_ONCE(mSensorState[sensor_type].enable);
-	} else if (alt) {
-		raw_enable = READ_ONCE(mSensorState[sensor_type].enable);
-		alt_enable = READ_ONCE(mSensorState[alt].enable);
-	}
-	if (sensor_id > ID_SENSOR_MAX_HANDLE) {
+
+	if (sensor_id < 0 || sensor_id > ID_SENSOR_MAX_HANDLE) {
 		pr_err("invalid sensor %d\n", sensor_id);
-		return err;
+		return 0;
 	}
 
 	if (obj->dispatch_data_cb[sensor_id] == NULL) {
 		pr_err("type:%d don't support this flow?\n", sensor_id);
 		return 0;
 	}
-	if (alt) {
-		if (obj->dispatch_data_cb[alt_id] == NULL) {
-			pr_err("alt:%d don't support this flow?\n", alt_id);
-			return 0;
-		}
-	}
-	if (data_t->flush_action != DATA_ACTION)
-		need_send = true;
-	else {
-		/* timestamp filter, drop which equal to each other at 1 ms */
-		timestamp_ms = (int64_t)data_t->time_stamp;
-		timestamp_ms = div_s64(timestamp_ms, 1000000);
-		if (last_timestamp_ms[sensor_id] != timestamp_ms) {
-			last_timestamp_ms[sensor_id] = timestamp_ms;
-			need_send = true;
-		} else
-			need_send = false;
-		if (!mSensorState[sensor_type].timestamp_filter)
-			need_send = true;
-	}
-	if (need_send == true && !alt) {
-		err = obj->dispatch_data_cb[sensor_id](data_t, NULL);
-		if (data_t->flush_action == FLUSH_ACTION)
-			atomic_dec(&mSensorState[sensor_type].flushCnt);
-	} else if (need_send == true && alt) {
-		if (alt_enable && data_t->flush_action == DATA_ACTION)
-			err = obj->dispatch_data_cb[alt_id](data_t, NULL);
-		else if (data_t->flush_action == FLUSH_ACTION) {
-			p_flush_count = &mSensorState[alt].flushCnt;
-			if (atomic_dec_if_positive(p_flush_count) >= 0)
-				err = obj->dispatch_data_cb[alt_id](data_t,
-					NULL);
-		}
-		if (raw_enable && data_t->flush_action == DATA_ACTION)
+
+	raw_enable = READ_ONCE(mSensorState[sensor_type].enable);
+	raw_enable_time = atomic64_read(&mSensorState[sensor_type].enableTime);
+
+	if (raw_enable && data_t->flush_action == DATA_ACTION) {
+		if (data_t->time_stamp > raw_enable_time)
 			err = obj->dispatch_data_cb[sensor_id](data_t, NULL);
-		else if (data_t->flush_action == FLUSH_ACTION) {
-			p_flush_count = &mSensorState[sensor_type].flushCnt;
-			if (atomic_dec_if_positive(p_flush_count) >= 0)
-				err = obj->dispatch_data_cb[sensor_id](data_t,
-					NULL);
-		} else if (data_t->flush_action == BIAS_ACTION ||
+		else
+			pr_info("ac:%d, e:%lld, d:%lld\n", data_t->flush_action,
+				raw_enable_time, data_t->time_stamp);
+	} else if (data_t->flush_action == FLUSH_ACTION) {
+		mutex_lock(&flush_mtx);
+		p_flush_count = &mSensorState[sensor_type].flushCnt;
+		if (atomic_read(p_flush_count) > 0) {
+			err = obj->dispatch_data_cb[sensor_id](data_t, NULL);
+			if (!err)
+				atomic_dec(p_flush_count);
+		}
+		mutex_unlock(&flush_mtx);
+	} else if (data_t->flush_action == BIAS_ACTION ||
 			data_t->flush_action == CALI_ACTION ||
 			data_t->flush_action == TEMP_ACTION ||
 			data_t->flush_action == TEST_ACTION)
-			err = obj->dispatch_data_cb[sensor_id](data_t, NULL);
+		err = obj->dispatch_data_cb[sensor_id](data_t, NULL);
+	return err;
+}
+
+static int SCP_sensorHub_report_alt_data(struct data_unit_t *data_t)
+{
+	struct SCP_sensorHub_data *obj = obj_data;
+	int err = 0, sensor_type = 0, sensor_id = 0, alt_id;
+	uint8_t alt = 0;
+	atomic_t *p_flush_count = NULL;
+	bool alt_enable = 0;
+	int64_t alt_enable_time = 0;
+
+	sensor_id = data_t->sensor_type;
+	sensor_type = sensor_id + ID_OFFSET;
+
+	if (sensor_id < 0 || sensor_id > ID_SENSOR_MAX_HANDLE) {
+		pr_err("invalid sensor %d\n", sensor_id);
+		return 0;
+	}
+
+	alt = READ_ONCE(mSensorState[sensor_type].alt);
+	alt_id = alt - ID_OFFSET;
+
+	if (alt == 0)
+		return 0;
+
+	if (obj->dispatch_data_cb[alt_id] == NULL) {
+		pr_err("alt:%d don't support this flow?\n", alt_id);
+		return 0;
+	}
+
+	alt_enable = READ_ONCE(mSensorState[alt].enable);
+	alt_enable_time = atomic64_read(&mSensorState[alt].enableTime);
+
+	if (alt_enable && data_t->flush_action == DATA_ACTION) {
+		if (data_t->time_stamp > alt_enable_time)
+			err = obj->dispatch_data_cb[alt_id](data_t, NULL);
+		else
+			pr_info("ac:%d, e:%lld, d:%lld\n", data_t->flush_action,
+				alt_enable_time, data_t->time_stamp);
+	} else if (data_t->flush_action == FLUSH_ACTION) {
+		mutex_lock(&flush_mtx);
+		p_flush_count = &mSensorState[alt].flushCnt;
+		if (atomic_read(p_flush_count) > 0) {
+			err = obj->dispatch_data_cb[alt_id](data_t, NULL);
+			if (!err)
+				atomic_dec(p_flush_count);
+		}
+		mutex_unlock(&flush_mtx);
 	}
 
 	return err;
 }
+
 static int SCP_sensorHub_server_dispatch_data(uint32_t *currWp)
 {
 	struct SCP_sensorHub_data *obj = obj_data;
 	char *pStart, *pEnd, *rp, *wp;
-	struct data_unit_t event, event_copy;
+	struct data_unit_t event;
 	uint32_t wp_copy;
 	int err = 0;
+
+	int64_t scp_time = 0;
 
 	pStart = (char *)READ_ONCE(obj->SCP_sensorFIFO) +
 		offsetof(struct sensorFIFO, data);
@@ -1129,7 +1160,6 @@ static int SCP_sensorHub_server_dispatch_data(uint32_t *currWp)
 	wp_copy = *currWp;
 	rp = pStart + READ_ONCE(obj->SCP_sensorFIFO->rp);
 	wp = pStart + wp_copy;
-
 
 	if (wp < pStart || pEnd < wp) {
 		pr_err("FIFO wp invalid : %p, %p, %p\n", pStart, pEnd, wp);
@@ -1149,38 +1179,65 @@ static int SCP_sensorHub_server_dispatch_data(uint32_t *currWp)
 	if (rp < wp) {
 		while (rp < wp) {
 			memcpy_fromio(&event, rp, SENSOR_DATA_SIZE);
-			/* sleep safe enough, data save in dram and not lost */
+
+			scp_time = event.time_stamp;
+			event.time_stamp +=
+				get_filter_output(&moving_average_algo);
+
 			do {
-				/* init event_copy when retry */
-				event_copy = event;
-				err = SCP_sensorHub_report_data(&event_copy);
+				err = SCP_sensorHub_report_raw_data(&event);
 				if (err < 0)
 					usleep_range(2000, 4000);
 			} while (err < 0);
+
+			do {
+				err = SCP_sensorHub_report_alt_data(&event);
+				if (err < 0)
+					usleep_range(2000, 4000);
+			} while (err < 0);
+
 			rp += SENSOR_DATA_SIZE;
 		}
 	} else if (rp > wp) {
 		while (rp < pEnd) {
 			memcpy_fromio(&event, rp, SENSOR_DATA_SIZE);
+			scp_time = event.time_stamp;
+			event.time_stamp +=
+				get_filter_output(&moving_average_algo);
+
 			do {
-				/* init event_copy when retry */
-				event_copy = event;
-				err = SCP_sensorHub_report_data(&event_copy);
+				err = SCP_sensorHub_report_raw_data(&event);
 				if (err < 0)
 					usleep_range(2000, 4000);
 			} while (err < 0);
+
+			do {
+				err = SCP_sensorHub_report_alt_data(&event);
+				if (err < 0)
+					usleep_range(2000, 4000);
+			} while (err < 0);
+
 			rp += SENSOR_DATA_SIZE;
 		}
 		rp = pStart;
 		while (rp < wp) {
 			memcpy_fromio(&event, rp, SENSOR_DATA_SIZE);
+			scp_time = event.time_stamp;
+			event.time_stamp +=
+				get_filter_output(&moving_average_algo);
+
 			do {
-				/* init event_copy when retry */
-				event_copy = event;
-				err = SCP_sensorHub_report_data(&event_copy);
+				err = SCP_sensorHub_report_raw_data(&event);
 				if (err < 0)
 					usleep_range(2000, 4000);
 			} while (err < 0);
+
+			do {
+				err = SCP_sensorHub_report_alt_data(&event);
+				if (err < 0)
+					usleep_range(2000, 4000);
+			} while (err < 0);
+
 			rp += SENSOR_DATA_SIZE;
 		}
 	}
@@ -1194,7 +1251,7 @@ static int SCP_sensorHub_server_dispatch_data(uint32_t *currWp)
 static int sensor_send_dram_info_to_hub(void)
 {				/* call by init done workqueue */
 	struct SCP_sensorHub_data *obj = obj_data;
-	SCP_SENSOR_HUB_DATA data;
+	union SCP_SENSOR_HUB_DATA data;
 	unsigned int len = 0;
 	int err = 0, retry = 0, total = 10;
 
@@ -1210,19 +1267,19 @@ static int sensor_send_dram_info_to_hub(void)
 	for (retry = 0; retry < total; ++retry) {
 		err = scp_sensorHub_req_send(&data, &len, 1);
 		if (err < 0) {
-			pr_err("sensor_send_dram_info_to_hub fail!\n");
+			pr_err("%s fail!\n", __func__);
 			continue;
 		}
 		break;
 	}
 	if (retry < total)
-		pr_notice("[sensorHub] sensor_send_dram_info_to_hub success\n");
+		pr_notice("[sensorHub] %s success\n", __func__);
 	return SCP_SENSOR_HUB_SUCCESS;
 }
 
 static int sensor_send_timestamp_wake_locked(void)
 {
-	SCP_SENSOR_HUB_DATA req;
+	union SCP_SENSOR_HUB_DATA req;
 	int len;
 	int err = 0;
 	uint64_t now_time, arch_counter;
@@ -1236,7 +1293,7 @@ static int sensor_send_timestamp_wake_locked(void)
 	req.set_config_req.action = SENSOR_HUB_SET_TIMESTAMP;
 	req.set_config_req.ap_timestamp = now_time;
 	req.set_config_req.arch_counter = arch_counter;
-	/* pr_err("ns=%lld, arch_counter=%lld!\n", now_time, arch_counter); */
+	pr_debug("sync ap boottime=%lld\n", now_time);
 	len = sizeof(req.set_config_req);
 	err = scp_sensorHub_req_send(&req, &len, 1);
 	if (err < 0)
@@ -1259,7 +1316,40 @@ static int sensor_send_timestamp_to_hub(void)
 	__pm_relax(&obj->ws);
 	return err;
 }
+static void sensor_disable_report_flush(uint8_t handle)
+{
+	struct SCP_sensorHub_data *obj = obj_data;
+	uint8_t sensor_type = handle + ID_OFFSET;
+	struct data_unit_t data_t;
+	atomic_t *p_flush_count = NULL;
+	SCP_sensorHub_handler func;
+	int ret = 0, retry = 0;
 
+	func = obj->dispatch_data_cb[handle];
+	if (!func)
+		return;
+
+	/*
+	 * disable sensor only check func return err 5 times
+	 */
+	mutex_lock(&flush_mtx);
+	p_flush_count = &mSensorState[sensor_type].flushCnt;
+	while (atomic_read(p_flush_count) > 0) {
+		atomic_dec(p_flush_count);
+		memset(&data_t, 0, sizeof(struct data_unit_t));
+		data_t.sensor_type = handle;
+		data_t.flush_action = FLUSH_ACTION;
+		do {
+			ret = func(&data_t, NULL);
+			if (ret < 0)
+				usleep_range(2000, 4000);
+		} while (ret < 0 && retry++ < 5);
+		if (ret < 0)
+			pr_err("%d flush complete err when disable\n",
+				handle);
+	}
+	mutex_unlock(&flush_mtx);
+}
 int sensor_enable_to_hub(uint8_t handle, int enabledisable)
 {
 	uint8_t sensor_type = handle + ID_OFFSET;
@@ -1277,6 +1367,9 @@ int sensor_enable_to_hub(uint8_t handle, int enabledisable)
 	}
 	if (mSensorState[sensor_type].sensorType) {
 		mSensorState[sensor_type].enable = enabledisable;
+		if (enabledisable)
+			atomic64_set(&mSensorState[sensor_type].enableTime,
+							ktime_get_boot_ns());
 		init_sensor_config_cmd(&cmd, sensor_type);
 		if (atomic_read(&power_status) == SENSOR_POWER_UP) {
 			ret = nanohub_external_write((const uint8_t *)&cmd,
@@ -1286,11 +1379,8 @@ int sensor_enable_to_hub(uint8_t handle, int enabledisable)
 				    ("fail registerlistener handle:%d,cmd:%d\n",
 				     handle, cmd.cmd);
 		}
-		if ((!enabledisable) &&
-			(atomic_read(&mSensorState[sensor_type].flushCnt))) {
-			pr_err("handle=%d flush count not 0 when disable\n",
-				handle);
-		}
+		if (!enabledisable)
+			sensor_disable_report_flush(handle);
 	} else {
 		pr_err("unhandle handle=%d, is inited?\n", handle);
 		mutex_unlock(&mSensorState_mtx);
@@ -1380,7 +1470,6 @@ int sensor_calibration_to_hub(uint8_t handle)
 	struct ConfigCmd cmd;
 	int ret = 0;
 
-	pr_err("sensor(%d) send calibration command to hub\n", sensor_type);
 	if (mSensorState[sensor_type].sensorType) {
 		init_sensor_config_cmd(&cmd, sensor_type);
 		cmd.cmd = CONFIG_CMD_CALIBRATE;
@@ -1424,7 +1513,7 @@ int sensor_selftest_to_hub(uint8_t handle)
 int sensor_get_data_from_hub(uint8_t sensorType,
 	struct data_unit_t *data)
 {
-	SCP_SENSOR_HUB_DATA req;
+	union SCP_SENSOR_HUB_DATA req;
 	struct data_unit_t *data_t;
 	int len = 0, err = 0;
 
@@ -1684,7 +1773,7 @@ int sensor_get_data_from_hub(uint8_t sensorType,
 		break;
 
 #ifdef VENDOR_EDIT
-/*QZL@PSW.BSP.Sensor, 2018/12/24, Add for oppo algo*/
+/*tangjh@PSW.BSP.Sensor, 2019/6/29, Add for oppo algo*/
 	case ID_FFD:
 		data->time_stamp = data_t->time_stamp;
 		data->ffd_data_t.value = data_t->ffd_data_t.value;
@@ -1729,11 +1818,11 @@ int sensor_get_data_from_hub(uint8_t sensorType,
 }
 
 int sensor_set_cmd_to_hub(uint8_t sensorType,
-	CUST_ACTION action, void *data)
+	enum CUST_ACTION action, void *data)
 {
-	SCP_SENSOR_HUB_DATA req;
+	union SCP_SENSOR_HUB_DATA req;
 	int len = 0, err = 0;
-	SCP_SENSOR_HUB_GET_RAW_DATA *pGetRawData;
+	struct SCP_SENSOR_HUB_GET_RAW_DATA *pGetRawData;
 
 	req.get_data_req.sensorType = sensorType;
 	req.get_data_req.action = SENSOR_HUB_SET_CUST;
@@ -1751,8 +1840,8 @@ int sensor_set_cmd_to_hub(uint8_t sensorType,
 		case CUST_ACTION_RESET_CALI:
 			req.set_cust_req.resetCali.action =
 				CUST_ACTION_RESET_CALI;
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.resetCali);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.resetCali);
 			break;
 		case CUST_ACTION_SET_CALI:
 			req.set_cust_req.setCali.action = CUST_ACTION_SET_CALI;
@@ -1762,49 +1851,49 @@ int sensor_set_cmd_to_hub(uint8_t sensorType,
 			    = *((int32_t *) data + SCP_SENSOR_HUB_Y);
 			req.set_cust_req.setCali.int32_data[SCP_SENSOR_HUB_Z]
 			    = *((int32_t *) data + SCP_SENSOR_HUB_Z);
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.setCali);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.setCali);
 			break;
 		case CUST_ACTION_SET_TRACE:
 			req.set_cust_req.setTrace.action =
 				CUST_ACTION_SET_TRACE;
 			req.set_cust_req.setTrace.trace = *((int32_t *) data);
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.setTrace);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.setTrace);
 			break;
 		case CUST_ACTION_SET_DIRECTION:
 			req.set_cust_req.setDirection.action =
 				CUST_ACTION_SET_DIRECTION;
 			req.set_cust_req.setDirection.direction =
 				*((int32_t *) data);
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.setDirection);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+			     custData) + sizeof(req.set_cust_req.setDirection);
 			break;
 		case CUST_ACTION_SET_FACTORY:
 			req.set_cust_req.setFactory.action =
 				CUST_ACTION_SET_FACTORY;
 			req.set_cust_req.setFactory.factory =
 				*((int32_t *) data);
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.setFactory);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.setFactory);
 			break;
 		case CUST_ACTION_SHOW_REG:
 			req.set_cust_req.showReg.action = CUST_ACTION_SHOW_REG;
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.showReg);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.showReg);
 			break;
 		case CUST_ACTION_GET_SENSOR_INFO:
 			req.set_cust_req.getInfo.action =
 				CUST_ACTION_GET_SENSOR_INFO;
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.getInfo);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.getInfo);
 			break;
 #ifdef VENDOR_EDIT
 //ye.zhang@PSE.BSP.Sensor, 2017-12-20, add for sensor self test
 		case CUST_ACTION_SELFTEST:
 			printk("::set CUST_ACTION_SELFTEST\n");
 			req.set_cust_req.showSelftest.action = CUST_ACTION_SELFTEST;
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, showSelftest)
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ, showSelftest)
 			    + sizeof(req.set_cust_req.showSelftest);
 			err = scp_sensorHub_req_send(&req, &len, 1);
 			if (err == 0) {
@@ -1835,15 +1924,15 @@ int sensor_set_cmd_to_hub(uint8_t sensorType,
 		case CUST_ACTION_SET_CALI:
 			req.set_cust_req.setCali.action = CUST_ACTION_SET_CALI;
 			req.set_cust_req.setCali.int32_data[0] = *((int32_t *) data);
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ, custData)
 			    + sizeof(req.set_cust_req.setCali);
 			break;
 #endif
 		case CUST_ACTION_GET_RAW_DATA:
 			req.set_cust_req.getRawData.action =
 				CUST_ACTION_GET_RAW_DATA;
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.getRawData);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.getRawData);
 			err = scp_sensorHub_req_send(&req, &len, 1);
 			if (err == 0) {
 				if ((req.set_cust_rsp.action !=
@@ -1867,20 +1956,20 @@ int sensor_set_cmd_to_hub(uint8_t sensorType,
 		case CUST_ACTION_SHOW_ALSLV:
 			req.set_cust_req.showAlslv.action =
 				CUST_ACTION_SHOW_ALSLV;
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.showAlslv);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.showAlslv);
 			break;
 		case CUST_ACTION_SHOW_ALSVAL:
 			req.set_cust_req.showAlsval.action =
 				CUST_ACTION_GET_RAW_DATA;
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.showAlsval);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.showAlsval);
 			break;
 		case CUST_ACTION_GET_SENSOR_INFO:
 			req.set_cust_req.getInfo.action =
 				CUST_ACTION_GET_SENSOR_INFO;
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-				+ sizeof(req.set_cust_req.getInfo);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.getInfo);
 			break;
 		default:
 			return -1;
@@ -1893,15 +1982,15 @@ int sensor_set_cmd_to_hub(uint8_t sensorType,
 		case CUST_ACTION_RESET_CALI:
 			req.set_cust_req.resetCali.action =
 				CUST_ACTION_RESET_CALI;
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.resetCali);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.resetCali);
 			break;
 		case CUST_ACTION_SET_CALI:
 			req.set_cust_req.setCali.action = CUST_ACTION_SET_CALI;
 #ifndef VENDOR_EDIT
 //zhq@PSE.BSP.Sensor, 2018-10-30, add for prox cali data from ap to scp
 			req.set_cust_req.setCali.int32_data[0] = *((int32_t *) data);
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ, custData)
 			    + sizeof(req.set_cust_req.setCali);
 #else
 			req.set_cust_req.setCali.action = CUST_ACTION_SET_CALI;
@@ -1911,7 +2000,7 @@ int sensor_set_cmd_to_hub(uint8_t sensorType,
 			    = *((int32_t *) data + SCP_SENSOR_HUB_Y);
 			req.set_cust_req.setCali.int32_data[SCP_SENSOR_HUB_Z]
 			    = *((int32_t *) data + SCP_SENSOR_HUB_Z);
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ, custData)
 			    + sizeof(req.set_cust_req.setCali);
 #endif
 			break;
@@ -1919,23 +2008,13 @@ int sensor_set_cmd_to_hub(uint8_t sensorType,
 			req.set_cust_req.setTrace.action =
 				CUST_ACTION_SET_TRACE;
 			req.set_cust_req.setTrace.trace = *((int32_t *) data);
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.setTrace);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.setTrace);
 			break;
-#ifdef VENDOR_EDIT
-/* Weiqin.Tang@PSW.BSP.Sensor, 2020/1/2, add for set factory flag to scp */
-        case CUST_ACTION_SET_FACTORY_FLAG:
-			req.set_cust_req.setFactoryFlag.action =
-				CUST_ACTION_SET_FACTORY_FLAG;
-			req.set_cust_req.setFactoryFlag.flag = *((int32_t *)data);
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.setFactoryFlag);
-			break;
-#endif
 		case CUST_ACTION_SHOW_REG:
 			req.set_cust_req.showReg.action = CUST_ACTION_SHOW_REG;
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.showReg);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.showReg);
 			break;
 		case CUST_ACTION_SET_PS_THRESHOLD:
 			req.set_cust_req.setPSThreshold.action =
@@ -1944,14 +2023,14 @@ int sensor_set_cmd_to_hub(uint8_t sensorType,
 			    = *((int32_t *) data + 0);
 			req.set_cust_req.setPSThreshold.threshold[1]
 			    = *((int32_t *) data + 1);
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.setPSThreshold);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+			    custData) + sizeof(req.set_cust_req.setPSThreshold);
 			break;
 		case CUST_ACTION_GET_RAW_DATA:
 			req.set_cust_req.getRawData.action =
 				CUST_ACTION_GET_RAW_DATA;
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.getRawData);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.getRawData);
 			err = scp_sensorHub_req_send(&req, &len, 1);
 			if (err == 0) {
 				if ((req.set_cust_rsp.action !=
@@ -1975,8 +2054,8 @@ int sensor_set_cmd_to_hub(uint8_t sensorType,
 		case CUST_ACTION_GET_SENSOR_INFO:
 			req.set_cust_req.getInfo.action =
 				CUST_ACTION_GET_SENSOR_INFO;
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-				+ sizeof(req.set_cust_req.getInfo);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.getInfo);
 			break;
 #ifdef VENDOR_EDIT
 	/*zhye@PSW.BSP.Sensor, 2017-12-28, add for read write als&prx register interface*/
@@ -1987,7 +2066,7 @@ int sensor_set_cmd_to_hub(uint8_t sensorType,
 			req.set_cust_req.showSelftest.buff[1]= ((u8 *) data)[1];
 			req.set_cust_req.showSelftest.buff[2]= ((u8 *) data)[2];
 
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, showSelftest)
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ, showSelftest)
 			    + sizeof(req.set_cust_req.showSelftest);
 			err = scp_sensorHub_req_send(&req, &len, 1);
 			if (err == 0) {
@@ -2012,13 +2091,13 @@ int sensor_set_cmd_to_hub(uint8_t sensorType,
 			req.set_cust_req.syncUTC.u32_data[2] = ((u32 *) data)[2];
 			req.set_cust_req.syncUTC.u32_data[3] = ((u32 *) data)[3];
 
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, syncUTC)
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ, syncUTC)
 			    + sizeof(req.set_cust_req.syncUTC);
 			break;
 		case CUST_ACTION_SELFTEST:
 			printk("::set CUST_ACTION_SELFTEST\n");
 			req.set_cust_req.showSelftest.action = CUST_ACTION_SELFTEST;
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, showSelftest)
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ, showSelftest)
 					+ sizeof(req.set_cust_req.showSelftest);
 			err = scp_sensorHub_req_send(&req, &len, 1);
 			if (err == 0) {
@@ -2036,7 +2115,7 @@ int sensor_set_cmd_to_hub(uint8_t sensorType,
   				pr_err("::scp_sensorHub_req_send::CUST_ACTION_SELFTEST::failed  3!\n");
 			}
 			return 0;
-#endif//VENDOR_EDIT
+	#endif//VENDOR_EDIT
 		default:
 			return -1;
 		}
@@ -2049,19 +2128,19 @@ int sensor_set_cmd_to_hub(uint8_t sensorType,
 			req.set_cust_req.setTrace.action =
 				CUST_ACTION_SET_TRACE;
 			req.set_cust_req.setTrace.trace = *((int32_t *) data);
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.setTrace);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.setTrace);
 			break;
 		case CUST_ACTION_SHOW_REG:
 			req.set_cust_req.showReg.action = CUST_ACTION_SHOW_REG;
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.showReg);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.showReg);
 			break;
 		case CUST_ACTION_GET_SENSOR_INFO:
 			req.set_cust_req.getInfo.action =
 				CUST_ACTION_GET_SENSOR_INFO;
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-				+ sizeof(req.set_cust_req.getInfo);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.getInfo);
 			break;
 		default:
 			return -1;
@@ -2074,8 +2153,8 @@ int sensor_set_cmd_to_hub(uint8_t sensorType,
 		case CUST_ACTION_RESET_CALI:
 			req.set_cust_req.resetCali.action =
 				CUST_ACTION_RESET_CALI;
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.resetCali);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.resetCali);
 			break;
 		case CUST_ACTION_SET_CALI:
 			req.set_cust_req.setCali.action = CUST_ACTION_SET_CALI;
@@ -2085,43 +2164,43 @@ int sensor_set_cmd_to_hub(uint8_t sensorType,
 			    = *((int32_t *) data + SCP_SENSOR_HUB_Y);
 			req.set_cust_req.setCali.int32_data[SCP_SENSOR_HUB_Z]
 			    = *((int32_t *) data + SCP_SENSOR_HUB_Z);
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.setCali);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.setCali);
 			break;
 		case CUST_ACTION_SET_TRACE:
 			req.set_cust_req.setTrace.action =
 				CUST_ACTION_SET_TRACE;
 			req.set_cust_req.setTrace.trace = *((int32_t *) data);
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.setTrace);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.setTrace);
 			break;
 		case CUST_ACTION_SET_DIRECTION:
 			req.set_cust_req.setDirection.action =
 				CUST_ACTION_SET_DIRECTION;
 			req.set_cust_req.setDirection.direction =
 				*((int32_t *) data);
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.setDirection);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+			     custData) + sizeof(req.set_cust_req.setDirection);
 			break;
 		case CUST_ACTION_SET_FACTORY:
 			req.set_cust_req.setFactory.action =
 				CUST_ACTION_SET_FACTORY;
 			req.set_cust_req.setFactory.factory =
 				*((int32_t *) data);
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.setFactory);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.setFactory);
 			break;
 		case CUST_ACTION_SHOW_REG:
 			req.set_cust_req.showReg.action =
 				CUST_ACTION_SHOW_REG;
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.showReg);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.showReg);
 			break;
 		case CUST_ACTION_GET_SENSOR_INFO:
 			req.set_cust_req.getInfo.action =
 				CUST_ACTION_GET_SENSOR_INFO;
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-				+ sizeof(req.set_cust_req.getInfo);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.getInfo);
 			break;
 		default:
 			return -1;
@@ -2135,13 +2214,13 @@ int sensor_set_cmd_to_hub(uint8_t sensorType,
 			req.set_cust_req.setTrace.action =
 				CUST_ACTION_SET_TRACE;
 			req.set_cust_req.setTrace.trace = *((int32_t *) data);
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.setTrace);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.setTrace);
 			break;
 		case CUST_ACTION_SHOW_REG:
 			req.set_cust_req.showReg.action = CUST_ACTION_SHOW_REG;
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.showReg);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.showReg);
 			break;
 		default:
 			return -1;
@@ -2155,34 +2234,34 @@ int sensor_set_cmd_to_hub(uint8_t sensorType,
 			req.set_cust_req.setTrace.action =
 				CUST_ACTION_SET_TRACE;
 			req.set_cust_req.setTrace.trace = *((int32_t *) data);
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.setTrace);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.setTrace);
 			break;
 		case CUST_ACTION_SET_DIRECTION:
 			req.set_cust_req.setDirection.action =
 				CUST_ACTION_SET_DIRECTION;
 			req.set_cust_req.setDirection.direction =
 				*((int32_t *) data);
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.setDirection);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+			     custData) + sizeof(req.set_cust_req.setDirection);
 			break;
 		case CUST_ACTION_SHOW_REG:
 			req.set_cust_req.showReg.action = CUST_ACTION_SHOW_REG;
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.showReg);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.showReg);
 			break;
 		case CUST_ACTION_GET_SENSOR_INFO:
 			req.set_cust_req.getInfo.action =
 				CUST_ACTION_GET_SENSOR_INFO;
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.getInfo);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.getInfo);
 			break;
 	#ifdef VENDOR_EDIT
 	//ye.zhang@PSE.BSP.Sensor, 2017-12-20, add for sensor self test
 		case CUST_ACTION_SELFTEST:
 			printk("::set CUST_ACTION_SELFTEST\n");
 			req.set_cust_req.showSelftest.action = CUST_ACTION_SELFTEST;
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, showSelftest)
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ, showSelftest)
 			    + sizeof(req.set_cust_req.showSelftest);
 			err = scp_sensorHub_req_send(&req, &len, 1);
 			if (err == 0) {
@@ -2212,8 +2291,8 @@ int sensor_set_cmd_to_hub(uint8_t sensorType,
 		case CUST_ACTION_GET_SENSOR_INFO:
 			req.set_cust_req.getInfo.action =
 				CUST_ACTION_GET_SENSOR_INFO;
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-			    + sizeof(req.set_cust_req.getInfo);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.getInfo);
 			break;
 		default:
 			return -1;
@@ -2227,8 +2306,8 @@ int sensor_set_cmd_to_hub(uint8_t sensorType,
 			req.set_cust_req.setTrace.action =
 				CUST_ACTION_SET_TRACE;
 			req.set_cust_req.setTrace.trace = *((int32_t *) data);
-			len = offsetof(SCP_SENSOR_HUB_SET_CUST_REQ, custData)
-				+ sizeof(req.set_cust_req.setTrace);
+			len = offsetof(struct SCP_SENSOR_HUB_SET_CUST_REQ,
+				custData) + sizeof(req.set_cust_req.setTrace);
 			break;
 		default:
 			return -1;
@@ -2267,7 +2346,7 @@ static void restoring_enable_sensorHub_sensor(int handle)
 {
 	uint8_t sensor_type = handle + ID_OFFSET;
 	int ret = 0;
-	int flush_cnt = 0;
+	int i = 0, flush_cnt = 0;
 	struct ConfigCmd cmd;
 
 	if (mSensorState[sensor_type].sensorType &&
@@ -2284,14 +2363,15 @@ static void restoring_enable_sensorHub_sensor(int handle)
 				handle, cmd.cmd);
 
 		cmd.cmd = CONFIG_CMD_FLUSH;
-		for (flush_cnt = 0; flush_cnt <
-			atomic_read(&mSensorState[sensor_type].flushCnt);
-			flush_cnt++) {
+		mutex_lock(&flush_mtx);
+		flush_cnt = atomic_read(&mSensorState[sensor_type].flushCnt);
+		for (i = 0; i < flush_cnt; i++) {
 			ret = nanohub_external_write((const uint8_t *)&cmd,
 				sizeof(struct ConfigCmd));
 			if (ret < 0)
 				pr_notice("failed flush handle:%d\n", handle);
 		}
+		mutex_unlock(&flush_mtx);
 	}
 
 }
@@ -2317,7 +2397,7 @@ void sensorHub_power_up_loop(void *data)
 	WRITE_ONCE(obj->SCP_sensorFIFO,
 		(struct sensorFIFO *)
 		(long)scp_get_reserve_mem_virt(SENS_MEM_ID));
-	WARN_ON(obj->SCP_sensorFIFO == NULL);
+	BUG_ON(obj->SCP_sensorFIFO == NULL);
 	WRITE_ONCE(obj->SCP_sensorFIFO->wp, 0);
 	WRITE_ONCE(obj->SCP_sensorFIFO->rp, 0);
 	WRITE_ONCE(obj->SCP_sensorFIFO->FIFOSize,
@@ -2460,9 +2540,9 @@ static int sensorHub_probe(struct platform_device *pdev)
 	SCP_sensorHub_init_flag = 0;
 	pr_debug("init done, data_unit_t size: %d,SCP_SENSOR_HUB_DATA size:%d\n",
 		(int)sizeof(struct data_unit_t),
-		(int)sizeof(SCP_SENSOR_HUB_DATA));
+		(int)sizeof(union SCP_SENSOR_HUB_DATA));
 	BUG_ON(sizeof(struct data_unit_t) != SENSOR_DATA_SIZE
-		|| sizeof(SCP_SENSOR_HUB_DATA) != SENSOR_IPI_SIZE);
+		|| sizeof(union SCP_SENSOR_HUB_DATA) != SENSOR_IPI_SIZE);
 	return 0;
 exit:
 	pr_err("%s: err = %d\n", __func__, err);
@@ -2512,9 +2592,7 @@ static void sensorHub_shutdown(struct platform_device *pdev)
 	}
 	mutex_unlock(&mSensorState_mtx);
 }
-
-
-static ssize_t nanohub_show_trace(struct device_driver *ddri, char *buf)
+static ssize_t nanohub_trace_show(struct device_driver *ddri, char *buf)
 {
 	struct SCP_sensorHub_data *obj = obj_data;
 	int i;
@@ -2526,14 +2604,14 @@ static ssize_t nanohub_show_trace(struct device_driver *ddri, char *buf)
 	return res;
 }
 
-static ssize_t nanohub_store_trace(struct device_driver *ddri,
+static ssize_t nanohub_trace_store(struct device_driver *ddri,
 	const char *buf, size_t count)
 {
 	struct SCP_sensorHub_data *obj = obj_data;
 	int handle, trace = 0;
 	int res = 0;
 
-	pr_debug("nanohub_store_trace buf:%s\n", buf);
+	pr_debug("%s buf:%s\n", __func__, buf);
 	if (sscanf(buf, "%d,%d", &handle, &trace) != 2) {
 		pr_err("invalid content: '%s', length = %zu\n", buf, count);
 		goto err_out;
@@ -2562,10 +2640,10 @@ err_out:
 	return count;
 }
 
-static DRIVER_ATTR(trace, 0644, nanohub_show_trace, nanohub_store_trace);
+static DRIVER_ATTR_RW(nanohub_trace);
 
 static struct driver_attribute *nanohub_attr_list[] = {
-	&driver_attr_trace,	/*trace log */
+	&driver_attr_nanohub_trace,	/*trace log */
 };
 
 static int nanohub_create_attr(struct device_driver *driver)
@@ -2624,12 +2702,12 @@ static int sensorHub_pm_event(struct notifier_block *notifier,
 {
 	switch (pm_event) {
 	case PM_POST_SUSPEND:
-		pr_debug("resume bootime=%lld\n", ktime_get_boot_ns());
+		pr_debug("resume ap boottime=%lld\n", ktime_get_boot_ns());
 		WRITE_ONCE(rtc_compensation_suspend, false);
 		sensor_send_timestamp_to_hub();
 		return NOTIFY_DONE;
 	case PM_SUSPEND_PREPARE:
-		pr_debug("suspend bootime=%lld\n", ktime_get_boot_ns());
+		pr_debug("suspend ap boottime=%lld\n", ktime_get_boot_ns());
 		WRITE_ONCE(rtc_compensation_suspend, true);
 		return NOTIFY_DONE;
 	default:

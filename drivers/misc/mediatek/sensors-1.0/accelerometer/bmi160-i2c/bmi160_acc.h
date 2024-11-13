@@ -653,7 +653,7 @@ struct bmi160_t {
 	/**< bus read function pointer */
 	BMI160_BRD_FUNC_PTR;
 	/**< burst write function pointer */
-	void (*delay_msec)(BMI160_MDELAY_DATA_TYPE);
+	void (*delay_msec)(u32 BMI160_MDELAY_DATA_TYPE);
 	/**< delay function pointer */
 };
 

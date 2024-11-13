@@ -1472,8 +1472,7 @@ static int akm09911_enable(int en)
 	}
 	if (f_obj->flush) {
 		if (value == 1) {
-			pr_debug(
-				"will call akm09911_flush in akm09911_enable\n");
+			pr_debug("%s will call akm09911_flush\n", __func__);
 			akm09911_flush();
 		} else
 			f_obj->flush = false;
@@ -1617,7 +1616,7 @@ static int akm09911_factory_get_data(int32_t data[3], int *status)
 }
 static int akm09911_factory_get_raw_data(int32_t data[3])
 {
-	pr_debug("do not support akm09911_factory_get_raw_data!\n");
+	pr_debug("%s do not support!\n", __func__);
 	return 0;
 }
 static int akm09911_factory_enable_calibration(void)
@@ -1668,7 +1667,7 @@ static int akm09911_i2c_probe(struct i2c_client *client,
 	struct mag_control_path ctl = {0};
 	struct mag_data_path mag_data = {0};
 
-	pr_debug("akm09911_i2c_probe\n");
+	pr_debug("%s\n", __func__);
 	data = kzalloc(sizeof(struct akm09911_i2c_data), GFP_KERNEL);
 	if (!data) {
 		err = -ENOMEM;
@@ -1729,7 +1728,7 @@ static int akm09911_i2c_probe(struct i2c_client *client,
 	ctl.flush = akm09911_flush;
 	ctl.is_report_input_direct = false;
 	ctl.is_support_batch = data->hw.is_batch_supported;
-	strlcpy(ctl.libinfo.libname, "akl", sizeof(ctl.libinfo.libname));
+	strlcpy(ctl.libinfo.libname, "akm", sizeof(ctl.libinfo.libname));
 	ctl.libinfo.layout = AKECS_SetCert();
 	ctl.libinfo.deviceid = akm_device;
 	pr_info("srx--akm09911--layout=%d,did=%d\n", ctl.libinfo.layout,

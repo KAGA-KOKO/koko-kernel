@@ -122,15 +122,9 @@ static int pickup_motionhub_local_init(void)
 #if defined CONFIG_MTK_SCP_SENSORHUB_V1
     ctl.is_report_input_direct = true;
     ctl.is_support_batch = false;
-    #ifdef VENDOR_EDIT
-    ctl.is_support_wake_lock = true;
-    #endif
 #elif defined CONFIG_NANOHUB
     ctl.is_report_input_direct = true;
     ctl.is_support_batch = false;
-    #ifdef VENDOR_EDIT
-    ctl.is_support_wake_lock = true;
-    #endif
 #else
 #endif
 

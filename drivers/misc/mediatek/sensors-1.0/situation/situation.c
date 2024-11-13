@@ -25,7 +25,7 @@ static struct situation_context *situation_context_alloc_object(void)
 	struct situation_context *obj = kzalloc(sizeof(*obj), GFP_KERNEL);
 	int index;
 
-	pr_debug("situation_context_alloc_object++++\n");
+	pr_debug("%s start\n", __func__);
 	if (!obj) {
 		pr_err("Alloc situ object error!\n");
 		return NULL;
@@ -38,7 +38,7 @@ static struct situation_context *situation_context_alloc_object(void)
 		obj->ctl_context[index].latency_ns = -1;
 	}
 
-	pr_debug("situation_context_alloc_object----\n");
+	pr_debug("%s end\n", __func__);
 	return obj;
 }
 
@@ -80,20 +80,18 @@ static int handle_to_index(int handle)
 	case ID_SAR:
 		index = sar;
 		break;
-	case ID_SAR_MODEM:
-		index = sar_modem;
-		break;        
 	default:
 		index = -1;
-		pr_err("handle_to_index invalid handle:%d,index:%d\n",
+		pr_err("%s invalid handle:%d,index:%d\n", __func__,
 			handle, index);
 		return index;
 	}
-	pr_debug("handle_to_index handle:%d, index:%d\n", handle, index);
+	pr_debug("%s handle:%d, index:%d\n", __func__, handle, index);
 	return index;
 }
 
-int situation_data_report(int handle, uint32_t one_sample_data)
+int situation_data_report_t(int handle, uint32_t one_sample_data,
+	int64_t time_stamp)
 {
 	int err = 0, index = -1;
 	struct sensor_event event;
@@ -107,7 +105,7 @@ int situation_data_report(int handle, uint32_t one_sample_data)
 	}
 
 	pr_debug("situation_notify handle:%d, index:%d\n", handle, index);
-
+	event.time_stamp = time_stamp;
 	event.handle = handle;
 	event.flush_action = DATA_ACTION;
 	event.word[0] = one_sample_data;
@@ -117,8 +115,11 @@ int situation_data_report(int handle, uint32_t one_sample_data)
 		__pm_wakeup_event(&cxt->ws[index], 250);
 	return err;
 }
-
-int sar_data_report(int32_t value[3])
+int situation_data_report(int handle, uint32_t one_sample_data)
+{
+	return situation_data_report_t(handle, one_sample_data, 0);
+}
+int sar_data_report_t(int32_t value[3], int64_t time_stamp)
 {
 	int err = 0, index = -1;
 	struct sensor_event event;
@@ -131,6 +132,7 @@ int sar_data_report(int32_t value[3])
 		pr_err("[%s] invalid index\n", __func__);
 		return -1;
 	}
+	event.time_stamp = time_stamp;
 	event.handle = ID_SAR;
 	event.flush_action = DATA_ACTION;
 	event.word[0] = value[0];
@@ -142,12 +144,18 @@ int sar_data_report(int32_t value[3])
 		__pm_wakeup_event(&cxt->ws[index], 250);
 	return err;
 }
-
+int sar_data_report(int32_t value[3])
+{
+	return sar_data_report_t(value, 0);
+}
+int situation_notify_t(int handle, int64_t time_stamp)
+{
+	return situation_data_report_t(handle, 1, time_stamp);
+}
 int situation_notify(int handle)
 {
-	return situation_data_report(handle, 1);
+	return situation_data_report_t(handle, 1, 0);
 }
-
 int situation_flush_report(int handle)
 {
 	struct sensor_event event;
@@ -231,8 +239,7 @@ static ssize_t situation_store_active(struct device *dev,
 
 	err = sscanf(buf, "%d : %d", &handle, &en);
 	if (err < 0) {
-		pr_debug("situation_store_active param error: err = %d\n",
-			err);
+		pr_debug("%s param error: err = %d\n", __func__, err);
 		return err;
 	}
 	index = handle_to_index(handle);
@@ -240,7 +247,7 @@ static ssize_t situation_store_active(struct device *dev,
 		pr_err("[%s] invalid index\n", __func__);
 		return -1;
 	}
-	pr_debug("situation_store_active handle=%d, en=%d\n", handle, en);
+	pr_debug("%s handle=%d, en=%d\n", __func__, handle, en);
 
 	mutex_lock(&situation_context_obj->situation_op_mutex);
 	if (en == 1)
@@ -248,7 +255,7 @@ static ssize_t situation_store_active(struct device *dev,
 	else if (en == 0)
 		cxt->ctl_context[index].enable = 0;
 	else {
-		pr_err(" situation_store_active error !!\n");
+		pr_err("%s error !!\n", __func__);
 		err = -1;
 		goto err_out;
 	}
@@ -279,7 +286,7 @@ static ssize_t situation_store_active(struct device *dev,
 #else
 	err = situation_enable_and_batch(index);
 #endif
-	pr_debug("situation_store_active done\n");
+	pr_debug("%s done\n", __func__);
 err_out:
 	mutex_unlock(&situation_context_obj->situation_op_mutex);
 	if (err)
@@ -316,8 +323,7 @@ static ssize_t situation_store_batch(struct device *dev,
 	err = sscanf(buf, "%d,%d,%lld,%lld",
 		&handle, &flag, &samplingPeriodNs, &maxBatchReportLatencyNs);
 	if (err != 4) {
-		pr_err("situation_store_batch param error: err =%d\n",
-			err);
+		pr_err("%s param error: err =%d\n", __func__, err);
 		return err;
 	}
 	index = handle_to_index(handle);
@@ -379,10 +385,9 @@ static ssize_t situation_store_flush(struct device *dev,
 
 	err = kstrtoint(buf, 10, &handle);
 	if (err != 0)
-		pr_err("situation_store_flush param error: err=%d\n",
-		err);
+		pr_err("%s param error: err=%d\n", __func__, err);
 
-	pr_debug("situation_store_flush param: handle %d\n", handle);
+	pr_debug("%s param: handle %d\n", __func__, handle);
 
 	mutex_lock(&situation_context_obj->situation_op_mutex);
 	cxt = situation_context_obj;
@@ -425,7 +430,7 @@ static int situation_real_driver_init(void)
 {
 	int err = -1, i = 0;
 
-	pr_debug(" situation_real_driver_init +\n");
+	pr_debug("%s start\n", __func__);
 
 	for (i = 0; i < max_situation_support; i++) {
 		if (situation_init_list[i] != NULL) {
@@ -591,7 +596,7 @@ static int situation_probe(void)
 {
 	int err;
 
-	pr_debug("+++++++++++++situation_probe!!\n");
+	pr_debug("%s+++!!\n", __func__);
 
 	situation_context_obj = situation_context_alloc_object();
 	if (!situation_context_obj) {
@@ -622,13 +627,13 @@ static int situation_probe(void)
 		KOBJ_ADD);
 
 
-	pr_debug("----situation_probe OK !!\n");
+	pr_debug("%s OK !!\n", __func__);
 	return 0;
 
 real_driver_init_fail:
 	kfree(situation_context_obj);
 exit_alloc_data_failed:
-	pr_debug("----situation_probe fail !!!\n");
+	pr_debug("%s fail !!!\n", __func__);
 	return err;
 }
 

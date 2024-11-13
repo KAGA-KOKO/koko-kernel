@@ -2888,7 +2888,7 @@ static int akm09915_i2c_probe(struct i2c_client *client,
 	struct mag_control_path ctl = {0};
 	struct mag_data_path mag_data = {0};
 
-	pr_debug("akm09915_i2c_probe\n");
+	pr_debug("%s\n", __func__);
 
 	data = kzalloc(sizeof(struct akm09915_i2c_data), GFP_KERNEL);
 	if (!data) {

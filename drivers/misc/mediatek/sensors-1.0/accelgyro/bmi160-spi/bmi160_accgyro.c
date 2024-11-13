@@ -936,7 +936,7 @@ static int BMI160_ACC_ReadRawData(struct bmi160_accelgyro_data *obj, char *buf)
 		pr_err("read acc raw data failed.\n");
 		return -EIO;
 	}
-	sprintf(buf, "BMI160_ACC_ReadRawData %04x %04x %04x",
+	sprintf(buf, "%s %04x %04x %04x", __func__,
 		databuf[BMI160_ACC_AXIS_X], databuf[BMI160_ACC_AXIS_Y],
 		databuf[BMI160_ACC_AXIS_Z]);
 
@@ -3072,7 +3072,7 @@ static int bmi160_acc_enable_nodata(int en)
 		pr_err("BMI160_ACC_SetPowerMode failed.\n");
 		return -1;
 	}
-	pr_debug("bmi160_acc_enable_nodata ok!\n");
+	pr_debug("%s ok!\n", __func__);
 	return err;
 }
 
@@ -3130,12 +3130,12 @@ static int bmi160_acc_get_data(int *x, int *y, int *z, int *status)
 
 	err = BMI160_ACC_ReadSensorData(obj, buff, BMI160_BUFSIZE);
 	if (err < 0) {
-		pr_err("bmi160_acc_get_data failed.\n");
+		pr_err("%s failed.\n", __func__);
 		return err;
 	}
 	err = sscanf(buff, "%x %x %x", x, y, z);
 	if (err < 0) {
-		pr_err("bmi160_acc_get_data failed.\n");
+		pr_err("%s failed.\n", __func__);
 		return err;
 	}
 	*status = SENSOR_STATUS_ACCURACY_MEDIUM;
@@ -3355,7 +3355,7 @@ static int bmi160_gyro_get_data(int *x, int *y, int *z, int *status)
 
 	bmg_read_sensor_data(NULL, buff, BMG_BUFSIZE);
 	if (sscanf(buff, "%x %x %x", x, y, z) != 3)
-		pr_err("bmi160_gyro_get_data failed");
+		pr_err("%s failed\n", __func__);
 	*status = SENSOR_STATUS_ACCURACY_MEDIUM;
 	return 0;
 }
@@ -4488,7 +4488,7 @@ static int bmg_factory_get_data(int32_t data[3], int *status)
 }
 static int bmg_factory_get_raw_data(int32_t data[3])
 {
-	pr_debug("don't support bmg_factory_get_raw_data!\n");
+	pr_debug("%s don't support!\n", __func__);
 	return 0;
 }
 static int bmg_factory_enable_calibration(void)
@@ -4575,7 +4575,7 @@ static int bmi160_accelgyro_spi_probe(struct spi_device *spi)
 	struct gyro_control_path gyro_ctl = {0};
 	struct gyro_data_path gyro_data = {0};
 
-	pr_debug("enter bmi160_accelgyro_spi_probe");
+	pr_debug("%s enter\n", __func__);
 
 	obj = kzalloc(sizeof(*obj), GFP_KERNEL);
 	if (!obj) {
@@ -4830,12 +4830,12 @@ static int bmi160_accelgyro_spi_remove(struct spi_device *spi)
 
 static int bmi160_accelgyro_local_init(void)
 {
-	pr_debug(">>>>-bmi160_accelgyro_local_init.\n");
+	pr_debug("%s start.\n", __func__);
 	if (spi_register_driver(&bmi160_accelgyro_spi_driver))
 		return -1;
 	if ((-1 == bmi160_acc_init_flag) || (-1 == bmi160_gyro_init_flag))
 		return -1;
-	pr_debug("<<<<<-bmi160_accelgyro_local_init.\n");
+	pr_debug("%s end.\n", __func__);
 	return 0;
 }
 

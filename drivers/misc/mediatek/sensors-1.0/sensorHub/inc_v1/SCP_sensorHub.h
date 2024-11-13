@@ -17,6 +17,7 @@
 #define SCP_SENSOR_HUB_H
 
 #include <linux/ioctl.h>
+#include <linux/atomic.h>
 
 #if defined(CONFIG_MTK_SCP_SENSORHUB_V1)
 #error CONFIG_MTK_SCP_SENSORHUB_V1 should not configed
@@ -53,6 +54,7 @@ struct SensorState {
 	bool enable;
 	bool timestamp_filter;
 	atomic_t flushCnt;
+	atomic64_t enableTime;
 };
 
 #define SCP_SENSOR_HUB_TEMP_BUFSIZE     256
@@ -88,7 +90,7 @@ struct SensorState {
 #define    SCP_BATCH_TIMEOUT		3
 #define	   SCP_DIRECT_PUSH          4
 
-typedef struct {
+struct sensor_vec_t {
 	union {
 		struct {
 			int32_t x;
@@ -109,30 +111,30 @@ typedef struct {
 		};
 	};
 	uint32_t status;
-} sensor_vec_t;
+};
 
-typedef struct {
+struct heart_rate_event_t {
 	int32_t bpm;
 	int32_t status;
-} heart_rate_event_t;
+};
 
-typedef struct {
+struct significant_motion_event_t {
 	int32_t state;
-} significant_motion_event_t;
+};
 
-typedef struct {
+struct step_counter_event_t {
 	uint32_t accumulated_step_count;
-} step_counter_event_t;
+};
 
-typedef struct {
+struct step_detector_event_t {
 	uint32_t step_detect;
-} step_detector_event_t;
+};
 
-typedef struct {
+struct floor_counter_event_t {
 	uint32_t accumulated_floor_count;
-} floor_counter_event_t;
+};
 
-typedef enum {
+enum gesture_type_t {
 	GESTURE_NONE,
 	SHAKE,
 	TAP,
@@ -141,76 +143,64 @@ typedef enum {
 	SNAPSHOT,
 	PICKUP,
 	CHECK
-} gesture_type_t;
+};
 
-typedef struct {
+struct gesture_t {
 	int32_t probability;
-} gesture_t;
+};
 
-typedef struct {
+struct pedometer_event_t {
 	uint32_t accumulated_step_count;
 	uint32_t accumulated_step_length;
 	uint32_t step_frequency;
 	uint32_t step_length;
-} pedometer_event_t;
+};
 
-typedef struct {
+struct pressure_vec_t {
 	int32_t pressure;	/* Pa, i.e. hPa * 100 */
 	int32_t temperature;
 	uint32_t status;
-} pressure_vec_t;
+};
 
-typedef struct {
+struct proximity_vec_t {
 	uint32_t steps;
 	int32_t oneshot;
-} proximity_vec_t;
+};
 
-typedef struct {
+struct relative_humidity_vec_t {
 	int32_t relative_humidity;
 	int32_t temperature;
 	uint32_t status;
-} relative_humidity_vec_t;
+};
 
-
-typedef struct {
+struct sleepmonitor_event_t {
 	int32_t state;		/* sleep, restless, awake */
-} sleepmonitor_event_t;
+};
 
-typedef enum {
+enum fall_type {
 	FALL_NONE,
 	FALL,
 	FLOP,
 	FALL_MAX
-} fall_type;
-
-typedef struct {
-	uint8_t probability[FALL_MAX];	/* 0~100 */
-} fall_t;
-
-typedef struct {
-	int32_t state;		/* 0,1 */
-} tilt_event_t;
-
-typedef struct {
-	int32_t state;		/* 0,1 */
-} in_pocket_event_t;
-
-typedef struct {
-	uint32_t state;  /* geofence [source, result, operation_mode] */
-} geofence_event_t;
-
-struct sar_event_t {
-	struct {
-		int32_t data[3];
-		int32_t x_bias;
-		int32_t y_bias;
-		int32_t z_bias;
-	};
-	uint32_t status;
 };
 
+struct fall_t {
+	uint8_t probability[FALL_MAX];	/* 0~100 */
+};
+
+struct tilt_event_t {
+	int32_t state;		/* 0,1 */
+};
+
+struct in_pocket_event_t {
+	int32_t state;		/* 0,1 */
+};
+
+struct geofence_event_t {
+	uint32_t state;  /* geofence [source, result, operation_mode] */
+};
 #ifdef VENDOR_EDIT
-/*QZL@PSW.BSP.Sensor, 2018/12/24, Add for oppo algo*/
+/*tangjh@PSW.BSP.Sensor, 2019/7/1, Add for oppo algo*/
 typedef struct {
 	uint32_t value;
 	uint16_t report_count;
@@ -240,11 +230,18 @@ typedef struct {
 	int16_t state;
     uint16_t report_count;
 }lux_aod_event_t;
-
-
 #endif /*VENDOR_EDIT*/
+struct sar_event_t {
+	struct {
+		int32_t data[3];
+		int32_t x_bias;
+		int32_t y_bias;
+		int32_t z_bias;
+	};
+	uint32_t status;
+};
 
-typedef enum {
+enum activity_type_t {
 	STILL,
 	STANDING,
 	SITTING,
@@ -258,12 +255,11 @@ typedef enum {
 	TILTING,
 	UNKNOWN,
 	ACTIVITY_MAX
-} activity_type_t;
+};
 
-typedef struct {
+struct activity_t {
 	uint8_t probability[ACTIVITY_MAX];	/* 0~100 */
-} activity_t;
-
+};
 
 struct data_unit_t {
 	uint8_t sensor_type;
@@ -271,44 +267,44 @@ struct data_unit_t {
 	uint8_t reserve[2];
 	uint64_t time_stamp;
 	union {
-		sensor_vec_t accelerometer_t;
-		sensor_vec_t gyroscope_t;
-		sensor_vec_t magnetic_t;
-		sensor_vec_t orientation_t;
-		sensor_vec_t pdr_event;
+		struct sensor_vec_t accelerometer_t;
+		struct sensor_vec_t gyroscope_t;
+		struct sensor_vec_t magnetic_t;
+		struct sensor_vec_t orientation_t;
+		struct sensor_vec_t pdr_event;
 
 		int32_t light;
-		proximity_vec_t proximity_t;
+		struct proximity_vec_t proximity_t;
 		int32_t temperature;
-		pressure_vec_t pressure_t;
-		relative_humidity_vec_t relative_humidity_t;
+		struct pressure_vec_t pressure_t;
+		struct relative_humidity_vec_t relative_humidity_t;
 
-		sensor_vec_t uncalibrated_acc_t;
-		sensor_vec_t uncalibrated_mag_t;
-		sensor_vec_t uncalibrated_gyro_t;
+		struct sensor_vec_t uncalibrated_acc_t;
+		struct sensor_vec_t uncalibrated_mag_t;
+		struct sensor_vec_t uncalibrated_gyro_t;
 
-		pedometer_event_t pedometer_t;
+		struct pedometer_event_t pedometer_t;
 
-		heart_rate_event_t heart_rate_t;
-		significant_motion_event_t smd_t;
-		step_detector_event_t step_detector_t;
-		step_counter_event_t step_counter_t;
-		floor_counter_event_t floor_counter_t;
-		activity_t activity_data_t;
-		gesture_t gesture_data_t;
-		fall_t fall_data_t;
+		struct heart_rate_event_t heart_rate_t;
+		struct significant_motion_event_t smd_t;
+		struct step_detector_event_t step_detector_t;
+		struct step_counter_event_t step_counter_t;
+		struct floor_counter_event_t floor_counter_t;
+		struct activity_t activity_data_t;
+		struct gesture_t gesture_data_t;
+		struct fall_t fall_data_t;
+		struct tilt_event_t tilt_event;
+		struct in_pocket_event_t inpocket_event;
+		struct geofence_event_t geofence_data_t;
 #ifdef VENDOR_EDIT
-/*QZL@PSW.BSP.Sensor, 2018/12/24, Add for oppo algo*/
+/*tangjh@PSW.BSP.Sensor, 2019/7/1, Add for oppo algo*/
 		ffd_event_t ffd_data_t;
 		free_fall_event_t free_fall_data_t;
 		pickup_motion_event_t pickup_motion_data_t;
         action_detect_event_t action_detect_data_t;
         sar_modem_event_t sar_modem_event;
         lux_aod_event_t lux_aod_event;
-#endif /*VENDOR_EDIT*/
-		tilt_event_t tilt_event;
-		in_pocket_event_t inpocket_event;
-		geofence_event_t geofence_data_t;
+#endif /*VENDOR_EDIT*/		
 		struct sar_event_t sar_event;
 		int32_t data[8];
 	};
@@ -322,49 +318,51 @@ struct sensorFIFO {
 	struct data_unit_t data[0];
 };
 
-typedef struct {
+struct SCP_SENSOR_HUB_REQ {
 	uint8_t sensorType;
 	uint8_t action;
 	uint8_t reserve[2];
 	uint32_t data[11];
-} SCP_SENSOR_HUB_REQ;
+};
 
-typedef struct {
+struct SCP_SENSOR_HUB_RSP {
 	uint8_t sensorType;
 	uint8_t action;
 	int8_t errCode;
 	uint8_t reserve[1];
 	/* uint32_t    reserved[9]; */
-} SCP_SENSOR_HUB_RSP;
+};
 
-typedef struct {
+struct SCP_SENSOR_HUB_ACTIVATE_REQ {
 	uint8_t sensorType;
 	uint8_t action;
 	uint8_t reserve[2];
 	uint32_t enable;	/* 0 : disable ; 1 : enable */
 	/* uint32_t    reserved[9]; */
-} SCP_SENSOR_HUB_ACTIVATE_REQ;
+};
 
-typedef SCP_SENSOR_HUB_RSP SCP_SENSOR_HUB_ACTIVATE_RSP;
+#define SCP_SENSOR_HUB_ACTIVATE_RSP SCP_SENSOR_HUB_RSP
+/* typedef SCP_SENSOR_HUB_RSP SCP_SENSOR_HUB_ACTIVATE_RSP; */
 
-typedef struct {
+struct SCP_SENSOR_HUB_SET_DELAY_REQ {
 	uint8_t sensorType;
 	uint8_t action;
 	uint8_t reserve[2];
 	uint32_t delay;		/* ms */
 	/* uint32_t    reserved[9]; */
-} SCP_SENSOR_HUB_SET_DELAY_REQ;
+};
 
-typedef SCP_SENSOR_HUB_RSP SCP_SENSOR_HUB_SET_DELAY_RSP;
+#define SCP_SENSOR_HUB_SET_DELAY_RSP  SCP_SENSOR_HUB_RSP
+/* typedef SCP_SENSOR_HUB_RSP SCP_SENSOR_HUB_SET_DELAY_RSP; */
 
-typedef struct {
+struct SCP_SENSOR_HUB_GET_DATA_REQ {
 	uint8_t sensorType;
 	uint8_t action;
 	uint8_t reserve[2];
 	/* uint32_t    reserved[10]; */
-} SCP_SENSOR_HUB_GET_DATA_REQ;
+};
 
-typedef struct {
+struct SCP_SENSOR_HUB_GET_DATA_RSP {
 	uint8_t sensorType;
 	uint8_t action;
 	int8_t errCode;
@@ -375,9 +373,9 @@ typedef struct {
 		int16_t int16_Data[0];
 		int32_t int32_Data[0];
 	} data;
-} SCP_SENSOR_HUB_GET_DATA_RSP;
+};
 
-typedef struct {
+struct SCP_SENSOR_HUB_BATCH_REQ {
 	uint8_t sensorType;
 	uint8_t action;
 	uint8_t flag;
@@ -385,11 +383,12 @@ typedef struct {
 	uint32_t period_ms;	/* batch reporting time in ms */
 	uint32_t timeout_ms;	/* sampling time in ms */
 	/* uint32_t    reserved[7]; */
-} SCP_SENSOR_HUB_BATCH_REQ;
+};
 
-typedef SCP_SENSOR_HUB_RSP SCP_SENSOR_HUB_BATCH_RSP;
+#define SCP_SENSOR_HUB_BATCH_RSP SCP_SENSOR_HUB_RSP
+/* typedef SCP_SENSOR_HUB_RSP SCP_SENSOR_HUB_BATCH_RSP; */
 
-typedef struct {
+struct SCP_SENSOR_HUB_SET_CONFIG_REQ {
 	uint8_t sensorType;
 	uint8_t action;
 	uint8_t reserve[2];
@@ -399,11 +398,12 @@ typedef struct {
 	uint64_t ap_timestamp;
 	uint64_t arch_counter;
 	/* uint32_t    reserved[8]; */
-} SCP_SENSOR_HUB_SET_CONFIG_REQ;
+};
 
-typedef SCP_SENSOR_HUB_RSP SCP_SENSOR_HUB_SET_CONFIG_RSP;
+#define SCP_SENSOR_HUB_SET_CONFIG_RSP  SCP_SENSOR_HUB_RSP
+/* typedef SCP_SENSOR_HUB_RSP SCP_SENSOR_HUB_SET_CONFIG_RSP; */
 
-typedef enum {
+enum CUST_ACTION {
 	CUST_ACTION_SET_CUST = 1,
 	CUST_ACTION_SET_CALI,
 	CUST_ACTION_RESET_CALI,
@@ -416,48 +416,40 @@ typedef enum {
 	CUST_ACTION_SHOW_ALSVAL,
 	CUST_ACTION_SET_FACTORY,
 	CUST_ACTION_GET_SENSOR_INFO,
-/* Weiqin.Tang@PSW.BSP.Sensor, 2020/1/2, add for set factory flag to scp */
-    CUST_ACTION_SET_FACTORY_FLAG, /* 13 */
 #ifdef VENDOR_EDIT
 //ye.zhang@PSE.BSP.Sensor, 2017-12-20, add for sensor self test
 	CUST_ACTION_SELFTEST,
 	CUST_ACTION_RW_REGISTER,
 	CUST_ACTION_SCP_SYNC_UTC,
 #endif//VENDOR_EDIT
-} CUST_ACTION;
+};
 
-typedef struct {
-	CUST_ACTION action;
-} SCP_SENSOR_HUB_CUST;
+struct SCP_SENSOR_HUB_CUST {
+	enum CUST_ACTION action;
+};
 
-typedef struct {
-	CUST_ACTION action;
+struct SCP_SENSOR_HUB_SET_CUST {
+	enum CUST_ACTION action;
 	int32_t data[0];
-} SCP_SENSOR_HUB_SET_CUST;
+};
 
-typedef struct {
-	CUST_ACTION action;
+struct SCP_SENSOR_HUB_SET_TRACE {
+	enum CUST_ACTION action;
 	int trace;
-} SCP_SENSOR_HUB_SET_TRACE;
+};
 
-/* Weiqin.Tang@PSW.BSP.Sensor, 2020/1/2, add for set factory flag to scp */
-typedef struct {
-	CUST_ACTION    action;
-	int flag;
-} SCP_SENSOR_HUB_SET_FACTORY_FLAG;
-
-typedef struct {
-	CUST_ACTION action;
+struct SCP_SENSOR_HUB_SET_DIRECTION {
+	enum CUST_ACTION action;
 	int direction;
-} SCP_SENSOR_HUB_SET_DIRECTION;
+};
 
-typedef struct {
-	CUST_ACTION		action;
+struct SCP_SENSOR_HUB_SET_FACTORY {
+	enum CUST_ACTION	action;
 	unsigned int	factory;
-} SCP_SENSOR_HUB_SET_FACTORY;
+};
 
-typedef struct {
-	CUST_ACTION action;
+struct SCP_SENSOR_HUB_SET_CALI {
+	enum CUST_ACTION action;
 	union {
 		int8_t int8_data[0];
 		uint8_t uint8_data[0];
@@ -466,20 +458,27 @@ typedef struct {
 		int32_t int32_data[0];
 		uint32_t uint32_data[SCP_SENSOR_HUB_AXES_NUM];
 	};
-} SCP_SENSOR_HUB_SET_CALI;
+};
 
-typedef SCP_SENSOR_HUB_CUST SCP_SENSOR_HUB_RESET_CALI;
-typedef struct {
-	CUST_ACTION action;
+#define SCP_SENSOR_HUB_RESET_CALI   SCP_SENSOR_HUB_CUST
+/* typedef SCP_SENSOR_HUB_CUST SCP_SENSOR_HUB_RESET_CALI; */
+
+struct SCP_SENSOR_HUB_SETPS_THRESHOLD {
+	enum CUST_ACTION action;
 	int32_t threshold[2];
-} SCP_SENSOR_HUB_SETPS_THRESHOLD;
+};
 
-typedef SCP_SENSOR_HUB_CUST SCP_SENSOR_HUB_SHOW_REG;
-typedef SCP_SENSOR_HUB_CUST SCP_SENSOR_HUB_SHOW_ALSLV;
-typedef SCP_SENSOR_HUB_CUST SCP_SENSOR_HUB_SHOW_ALSVAL;
+#define SCP_SENSOR_HUB_SHOW_REG    SCP_SENSOR_HUB_CUST
+#define SCP_SENSOR_HUB_SHOW_ALSLV  SCP_SENSOR_HUB_CUST
+#define SCP_SENSOR_HUB_SHOW_ALSVAL SCP_SENSOR_HUB_CUST
+/*
+ * typedef SCP_SENSOR_HUB_CUST SCP_SENSOR_HUB_SHOW_REG;
+ * typedef SCP_SENSOR_HUB_CUST SCP_SENSOR_HUB_SHOW_ALSLV;
+ * typedef SCP_SENSOR_HUB_CUST SCP_SENSOR_HUB_SHOW_ALSVAL;
+ */
 
-typedef struct {
-	CUST_ACTION action;
+struct SCP_SENSOR_HUB_GET_RAW_DATA {
+	enum CUST_ACTION action;
 	union {
 		int8_t int8_data[0];
 		uint8_t uint8_data[0];
@@ -488,7 +487,7 @@ typedef struct {
 		int32_t int32_data[0];
 		uint32_t uint32_data[SCP_SENSOR_HUB_AXES_NUM];
 	};
-} SCP_SENSOR_HUB_GET_RAW_DATA;
+};
 
 struct mag_dev_info_t {
 	char libname[16];
@@ -502,7 +501,7 @@ struct sensorInfo_t {
 };
 
 struct scp_sensor_hub_get_sensor_info {
-	CUST_ACTION action;
+	enum CUST_ACTION action;
 	union {
 		int32_t int32_data[0];
 		struct sensorInfo_t sensorInfo;
@@ -517,40 +516,37 @@ enum {
 #ifdef VENDOR_EDIT
 //ye.zhang@PSE.BSP.Sensor, 2017-12-20, add for sensor self test
 typedef struct {
-	CUST_ACTION    action;
+	enum CUST_ACTION    action;
 	union{
 		uint8_t buff[4];
 		int32_t testResult;
 	};
 } SCP_SENSOR_HUB_SHOW_SELFTEST;
 typedef struct {
-	CUST_ACTION    action;
+	enum CUST_ACTION    action;
 	union{
 		uint32_t u32_data[4];  //date hour minute second
 	};
 } SCP_SENSOR_HUB_SYNC_UTC;
 #endif//VENDOR_EDIT
-
-typedef struct {
+struct SCP_SENSOR_HUB_SET_CUST_REQ {
 	uint8_t sensorType;
 	uint8_t action;
 	uint8_t reserve[2];
 	union {
 		uint32_t custData[11];
-		SCP_SENSOR_HUB_CUST cust;
-		SCP_SENSOR_HUB_SET_CUST setCust;
-		SCP_SENSOR_HUB_SET_CALI setCali;
-		SCP_SENSOR_HUB_RESET_CALI resetCali;
-		SCP_SENSOR_HUB_SET_TRACE setTrace;
-/* Weiqin.Tang@PSW.BSP.Sensor, 2020/1/2, add for set factory flag to scp */
-		SCP_SENSOR_HUB_SET_FACTORY_FLAG setFactoryFlag;
-		SCP_SENSOR_HUB_SET_DIRECTION setDirection;
-		SCP_SENSOR_HUB_SHOW_REG showReg;
-		SCP_SENSOR_HUB_GET_RAW_DATA getRawData;
-		SCP_SENSOR_HUB_SETPS_THRESHOLD setPSThreshold;
-		SCP_SENSOR_HUB_SHOW_ALSLV showAlslv;
-		SCP_SENSOR_HUB_SHOW_ALSVAL showAlsval;
-		SCP_SENSOR_HUB_SET_FACTORY	setFactory;
+		struct SCP_SENSOR_HUB_CUST cust;
+		struct SCP_SENSOR_HUB_SET_CUST setCust;
+		struct SCP_SENSOR_HUB_SET_CALI setCali;
+		struct SCP_SENSOR_HUB_RESET_CALI resetCali;
+		struct SCP_SENSOR_HUB_SET_TRACE setTrace;
+		struct SCP_SENSOR_HUB_SET_DIRECTION setDirection;
+		struct SCP_SENSOR_HUB_SHOW_REG showReg;
+		struct SCP_SENSOR_HUB_GET_RAW_DATA getRawData;
+		struct SCP_SENSOR_HUB_SETPS_THRESHOLD setPSThreshold;
+		struct SCP_SENSOR_HUB_SHOW_ALSLV showAlslv;
+		struct SCP_SENSOR_HUB_SHOW_ALSVAL showAlsval;
+		struct SCP_SENSOR_HUB_SET_FACTORY setFactory;
 		struct scp_sensor_hub_get_sensor_info getInfo;
 	#ifdef VENDOR_EDIT
 	//ye.zhang@PSE.BSP.Sensor, 2017-12-20, add for sensor self test
@@ -558,25 +554,25 @@ typedef struct {
 		SCP_SENSOR_HUB_SYNC_UTC syncUTC;
 	#endif//VENDOR_EDIT
 	};
-} SCP_SENSOR_HUB_SET_CUST_REQ;
+};
 
-typedef struct {
+struct SCP_SENSOR_HUB_SET_CUST_RSP {
 	uint8_t sensorType;
 	uint8_t action;
 	uint8_t errCode;
 	uint8_t reserve[1];
 	union {
 		uint32_t custData[11];
-		SCP_SENSOR_HUB_GET_RAW_DATA getRawData;
+		struct SCP_SENSOR_HUB_GET_RAW_DATA getRawData;
 		struct scp_sensor_hub_get_sensor_info getInfo;
 	#ifdef VENDOR_EDIT
 	//ye.zhang@PSE.BSP.Sensor, 2017-12-20, add for sensor self test
 		SCP_SENSOR_HUB_SHOW_SELFTEST showSelftest;
 	#endif//VENDOR_EDIT
 	};
-} SCP_SENSOR_HUB_SET_CUST_RSP;
+};
 
-typedef struct {
+struct SCP_SENSOR_HUB_NOTIFY_RSP {
 	uint8_t sensorType;
 	uint8_t action;
 	uint8_t event;
@@ -591,30 +587,30 @@ typedef struct {
 			uint64_t	arch_counter;
 		};
 	};
-} SCP_SENSOR_HUB_NOTIFY_RSP;
+};
 
-typedef union {
-	SCP_SENSOR_HUB_REQ req;
-	SCP_SENSOR_HUB_RSP rsp;
-	SCP_SENSOR_HUB_ACTIVATE_REQ activate_req;
-	SCP_SENSOR_HUB_ACTIVATE_RSP activate_rsp;
-	SCP_SENSOR_HUB_SET_DELAY_REQ set_delay_req;
-	SCP_SENSOR_HUB_SET_DELAY_RSP set_delay_rsp;
-	SCP_SENSOR_HUB_GET_DATA_REQ get_data_req;
-	SCP_SENSOR_HUB_GET_DATA_RSP get_data_rsp;
-	SCP_SENSOR_HUB_BATCH_REQ batch_req;
-	SCP_SENSOR_HUB_BATCH_RSP batch_rsp;
-	SCP_SENSOR_HUB_SET_CONFIG_REQ set_config_req;
-	SCP_SENSOR_HUB_SET_CONFIG_RSP set_config_rsp;
-	SCP_SENSOR_HUB_SET_CUST_REQ set_cust_req;
-	SCP_SENSOR_HUB_SET_CUST_RSP set_cust_rsp;
-	SCP_SENSOR_HUB_NOTIFY_RSP notify_rsp;
-} SCP_SENSOR_HUB_DATA, *SCP_SENSOR_HUB_DATA_P;
+union SCP_SENSOR_HUB_DATA {
+	struct SCP_SENSOR_HUB_REQ req;
+	struct SCP_SENSOR_HUB_RSP rsp;
+	struct SCP_SENSOR_HUB_ACTIVATE_REQ activate_req;
+	struct SCP_SENSOR_HUB_ACTIVATE_RSP activate_rsp;
+	struct SCP_SENSOR_HUB_SET_DELAY_REQ set_delay_req;
+	struct SCP_SENSOR_HUB_SET_DELAY_RSP set_delay_rsp;
+	struct SCP_SENSOR_HUB_GET_DATA_REQ get_data_req;
+	struct SCP_SENSOR_HUB_GET_DATA_RSP get_data_rsp;
+	struct SCP_SENSOR_HUB_BATCH_REQ batch_req;
+	struct SCP_SENSOR_HUB_BATCH_RSP batch_rsp;
+	struct SCP_SENSOR_HUB_SET_CONFIG_REQ set_config_req;
+	struct SCP_SENSOR_HUB_SET_CONFIG_RSP set_config_rsp;
+	struct SCP_SENSOR_HUB_SET_CUST_REQ set_cust_req;
+	struct SCP_SENSOR_HUB_SET_CUST_RSP set_cust_rsp;
+	struct SCP_SENSOR_HUB_NOTIFY_RSP notify_rsp;
+};
 
 typedef int (*SCP_sensorHub_handler)(struct data_unit_t *event,
 	void *reserved);
 
-int scp_sensorHub_req_send(SCP_SENSOR_HUB_DATA_P data,
+int scp_sensorHub_req_send(union SCP_SENSOR_HUB_DATA *data,
 	uint *len, unsigned int wait);
 int scp_sensorHub_data_registration(uint8_t sensor,
 	SCP_sensorHub_handler handler);
@@ -623,7 +619,7 @@ int sensor_set_delay_to_hub(uint8_t sensorType, unsigned int delayms);
 int sensor_get_data_from_hub(uint8_t sensorType,
 	struct data_unit_t *data);
 int sensor_set_cmd_to_hub(uint8_t sensorType,
-	CUST_ACTION action, void *data);
+	enum CUST_ACTION action, void *data);
 int sensor_batch_to_hub(uint8_t sensorType,
 	int flag, int64_t samplingPeriodNs, int64_t maxBatchReportLatencyNs);
 int sensor_flush_to_hub(uint8_t sensorType);
