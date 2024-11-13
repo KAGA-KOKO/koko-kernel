@@ -33,9 +33,9 @@
 #include <linux/notifier.h>
 #include "scp_helper.h"
 
-enum LNACCHUB_TRC {
+typedef enum {
 	LNACCHUB_TRC_INFO = 0X10,
-};
+} LNACCHUB_TRC;
 
 static struct fusion_init_info linearacchub_init_info;
 static int linearacc_get_data(int *x, int *y, int *z,

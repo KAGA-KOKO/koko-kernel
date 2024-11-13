@@ -53,8 +53,11 @@
 #define MPU6050_RANGE_16G			(0x03 << 3)
 /* #define MPU6050_SELF_TEST         0x80 */
 
-/* enable low power sleep mode */
-#define MPU6050_SLEEP				0x40
+
+#define MPU6050_SLEEP				0x40	/* enable low power sleep mode */
+
+
+
 
 #define MPU6050_BUFSIZE				256
 

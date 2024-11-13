@@ -37,9 +37,9 @@
 #include <linux/notifier.h>
 #include "scp_helper.h"
 
-enum GLGHUB_TRC {
+typedef enum {
 	GLGHUBH_TRC_INFO = 0X10,
-};
+} GLGHUB_TRC;
 
 static struct situation_init_info glghub_init_info;
 
@@ -87,8 +87,7 @@ static int glance_gesture_recv_data(struct data_unit_t *event,
 	if (event->flush_action == FLUSH_ACTION)
 		pr_debug("glance_gesture do not support flush\n");
 	else if (event->flush_action == DATA_ACTION)
-		err = situation_notify_t(ID_GLANCE_GESTURE,
-				(int64_t)event->time_stamp);
+		err = situation_notify(ID_GLANCE_GESTURE);
 	return err;
 }
 

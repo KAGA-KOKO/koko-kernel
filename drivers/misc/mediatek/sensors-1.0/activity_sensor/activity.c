@@ -117,7 +117,7 @@ static struct act_context *act_context_alloc_object(void)
 {
 	struct act_context *obj = kzalloc(sizeof(*obj), GFP_KERNEL);
 
-	pr_debug("%s start\n", __func__);
+	pr_debug("act_context_alloc_object++++\n");
 	if (!obj) {
 		pr_err("Alloc act object error!\n");
 		return NULL;
@@ -137,7 +137,7 @@ static struct act_context *act_context_alloc_object(void)
 	obj->delay_ns = -1;
 	obj->latency_ns = -1;
 	mutex_init(&obj->act_op_mutex);
-	pr_debug("%s end\n", __func__);
+	pr_debug("act_context_alloc_object----\n");
 	return obj;
 }
 #ifndef CONFIG_NANOHUB
@@ -241,14 +241,14 @@ static ssize_t act_store_active(struct device *dev,
 	struct act_context *cxt = act_context_obj;
 	int err = -1;
 
-	pr_debug("%s buf=%s\n", __func__, buf);
+	pr_debug("act_store_active buf=%s\n", buf);
 	mutex_lock(&act_context_obj->act_op_mutex);
 	if (!strncmp(buf, "1", 1))
 		cxt->enable = 1;
 	else if (!strncmp(buf, "0", 1))
 		cxt->enable = 0;
 	else {
-		pr_err("%s error !!\n", __func__);
+		pr_err(" act_store_active error !!\n");
 		err = -1;
 		goto err_out;
 	}
@@ -261,7 +261,7 @@ static ssize_t act_store_active(struct device *dev,
 #else
 	err = act_enable_and_batch();
 #endif
-	pr_debug("%s done\n", __func__);
+	pr_debug(" act_store_active done\n");
 err_out:
 	mutex_unlock(&act_context_obj->act_op_mutex);
 	return err;
@@ -276,9 +276,10 @@ static ssize_t act_show_active(struct device *dev,
 
 	cxt = act_context_obj;
 	/* int len = 0; */
-	pr_debug("%s not support now\n", __func__);
+	pr_debug("act show active not support now\n");
 	/* div=cxt->act_data.vender_div; */
-	pr_debug("%s not support now,vender_div value: %d\n", __func__, div);
+	pr_debug("act show active not support now,vender_div value: %d\n",
+		div);
 	return snprintf(buf, PAGE_SIZE, "%d\n", div);
 
 	/* return len; */
@@ -291,11 +292,11 @@ static ssize_t act_store_batch(struct device *dev,
 	struct act_context *cxt = act_context_obj;
 	int handle = 0, flag = 0, err = 0;
 
-	pr_debug("%s %s\n", __func__, buf);
+	pr_debug(" act_store_batch %s\n", buf);
 	err = sscanf(buf, "%d,%d,%lld,%lld", &handle, &flag, &cxt->delay_ns,
 		     &cxt->latency_ns);
 	if (err != 4) {
-		pr_err("%s param error: err = %d\n", __func__, err);
+		pr_err("act_store_batch param error: err = %d\n", err);
 		return -1;
 	}
 	mutex_lock(&act_context_obj->act_op_mutex);
@@ -329,9 +330,9 @@ static ssize_t act_store_flush(struct device *dev,
 
 	err = kstrtoint(buf, 10, &handle);
 	if (err != 0)
-		pr_err("%s param error: err = %d\n", __func__, err);
+		pr_err("act_store_flush param error: err = %d\n", err);
 
-	pr_debug("%s param: handle %d\n", __func__, handle);
+	pr_debug("act_store_flush param: handle %d\n", handle);
 
 	mutex_lock(&act_context_obj->act_op_mutex);
 	cxt = act_context_obj;
@@ -360,13 +361,13 @@ static ssize_t act_show_devnum(struct device *dev,
 
 static int activity_remove(struct platform_device *pdev)
 {
-	pr_debug("%s\n", __func__);
+	pr_debug("activity_remove\n");
 	return 0;
 }
 
 static int activity_probe(struct platform_device *pdev)
 {
-	pr_debug("%s\n", __func__);
+	pr_debug("activity_probe\n");
 	return 0;
 }
 
@@ -394,7 +395,7 @@ static int act_real_driver_init(void)
 	int i = 0;
 	int err = 0;
 
-	pr_debug("%s start\n", __func__);
+	pr_debug(" act_real_driver_init +\n");
 	for (i = 0; i < MAX_CHOOSE_ACT_NUM; i++) {
 		pr_debug(" i=%d\n", i);
 		if (activity_init_list[i] != 0) {
@@ -410,7 +411,7 @@ static int act_real_driver_init(void)
 	}
 
 	if (i == MAX_CHOOSE_ACT_NUM) {
-		pr_debug("%s fail\n", __func__);
+		pr_debug(" act_real_driver_init fail\n");
 		err = -1;
 	}
 	return err;
@@ -597,7 +598,7 @@ static int act_probe(void)
 {
 	int err;
 
-	pr_debug("++++%s!!\n", __func__);
+	pr_debug("+++++++++++++act_probe!!\n");
 
 	act_context_obj = act_context_alloc_object();
 	if (!act_context_obj) {
@@ -617,7 +618,7 @@ static int act_probe(void)
 	/* pr_err("act_factory_device_init fail\n"); */
 	/* } */
 
-	pr_debug("%s OK !!\n", __func__);
+	pr_debug("----act_probe OK !!\n");
 	return 0;
 
 real_driver_init_fail:
@@ -625,7 +626,7 @@ real_driver_init_fail:
 
 exit_alloc_data_failed:
 
-	pr_debug("%s fail !!!\n", __func__);
+	pr_debug("----act_probe fail !!!\n");
 	return err;
 }
 

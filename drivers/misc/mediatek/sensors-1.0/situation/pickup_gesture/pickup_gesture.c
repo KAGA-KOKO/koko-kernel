@@ -39,9 +39,9 @@
 #include <linux/notifier.h>
 #include "scp_helper.h"
 
-enum PKUPHUB_TRC {
+typedef enum {
 	PKUPHUB_TRC_INFO = 0X10,
-};
+} PKUPHUB_TRC;
 
 static struct situation_init_info pkuphub_init_info;
 
@@ -90,8 +90,7 @@ static int pickup_gesture_recv_data(struct data_unit_t *event,
 	if (event->flush_action == FLUSH_ACTION)
 		pr_debug("pickup_gesture do not support flush\n");
 	else if (event->flush_action == DATA_ACTION)
-		err = situation_notify_t(ID_PICK_UP_GESTURE,
-				(int64_t)event->time_stamp);
+		err = situation_notify(ID_PICK_UP_GESTURE);
 	return err;
 }
 

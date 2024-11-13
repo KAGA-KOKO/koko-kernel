@@ -110,7 +110,7 @@ ssize_t sensor_event_read(unsigned char handle, struct file *file,
 	size_t read = 0;
 
 	if (count != 0 && count < sizeof(struct sensor_event)) {
-		pr_err("%s handle: %d err count(%d)\n", __func__,
+		pr_err("sensor_event_read handle: %d err count(%d)\n",
 			  handle, (int)count);
 		return -EINVAL;
 	}
@@ -119,7 +119,7 @@ ssize_t sensor_event_read(unsigned char handle, struct file *file,
 		if (client->head == client->tail)
 			return 0;
 		if (count == 0) {
-			pr_debug("%s count: %d\n", __func__, (int)count);
+			pr_debug("sensor_event_read count: %d\n", (int)count);
 			break;
 		}
 

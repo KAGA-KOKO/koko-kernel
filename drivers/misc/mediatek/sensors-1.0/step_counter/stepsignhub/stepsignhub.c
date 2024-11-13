@@ -21,9 +21,9 @@
 #include <linux/notifier.h>
 #include "scp_helper.h"
 
-enum STEP_CDS_TRC {
+typedef enum {
 	STEP_CDSH_TRC_INFO = 0X10,
-};
+} STEP_CDS_TRC;
 
 static struct step_c_init_info step_cdshub_init_info;
 
@@ -33,8 +33,12 @@ struct step_chub_ipi_data {
 };
 
 static struct step_chub_ipi_data obj_ipi_data;
+static ssize_t show_step_cds_value(struct device_driver *ddri, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%s\n", buf);
+}
 
-static ssize_t trace_store(struct device_driver *ddri,
+static ssize_t store_trace_value(struct device_driver *ddri,
 	const char *buf, size_t count)
 {
 	struct step_chub_ipi_data *obj = &obj_ipi_data;
@@ -55,9 +59,11 @@ static ssize_t trace_store(struct device_driver *ddri,
 	return count;
 }
 
-static DRIVER_ATTR_WO(trace);
+static DRIVER_ATTR(step_cds, 0444, show_step_cds_value, NULL);
+static DRIVER_ATTR(trace, 0644, NULL, store_trace_value);
 
 static struct driver_attribute *step_chub_attr_list[] = {
+	&driver_attr_step_cds,
 	&driver_attr_trace,
 };
 
@@ -271,7 +277,7 @@ static int floor_counter_get_data(uint32_t *counter, int *status)
 
 	err = sensor_get_data_from_hub(ID_FLOOR_COUNTER, &data);
 	if (err < 0) {
-		pr_err("%s fail!!\n", __func__);
+		pr_err("floor_counter_get_data fail!!\n");
 		return -1;
 	}
 	time_stamp = data.time_stamp;
@@ -292,8 +298,7 @@ static int step_detect_recv_data(struct data_unit_t *event,
 	if (event->flush_action == FLUSH_ACTION)
 		err = step_d_flush_report();
 	else if (event->flush_action == DATA_ACTION)
-		err = step_notify_t(TYPE_STEP_DETECTOR,
-			(int64_t)event->time_stamp);
+		err = step_notify(TYPE_STEP_DETECTOR);
 	return err;
 }
 
@@ -304,9 +309,8 @@ static int step_count_recv_data(struct data_unit_t *event, void *reserved)
 	if (event->flush_action == FLUSH_ACTION)
 		err = step_c_flush_report();
 	else if (event->flush_action == DATA_ACTION)
-		err = step_c_data_report_t(
-			event->step_counter_t.accumulated_step_count,
-			2, (int64_t)event->time_stamp);
+		err = step_c_data_report(
+			event->step_counter_t.accumulated_step_count, 2);
 	return err;
 }
 
@@ -317,22 +321,20 @@ static int sign_recv_data(struct data_unit_t *event, void *reserved)
 	if (event->flush_action == FLUSH_ACTION)
 		pr_err("sign do not support flush\n");
 	else if (event->flush_action == DATA_ACTION)
-		err = step_notify_t(TYPE_SIGNIFICANT,
-			(int64_t)event->time_stamp);
+		err = step_notify(TYPE_SIGNIFICANT);
 	return err;
 }
 
 static int floor_count_recv_data(struct data_unit_t *event, void *reserved)
 {
 	int err = 0;
-	struct floor_counter_event_t *pfloor_counter = &event->floor_counter_t;
+	floor_counter_event_t *pfloor_counter = &event->floor_counter_t;
 
 	if (event->flush_action == FLUSH_ACTION)
 		err = floor_c_flush_report();
 	else if (event->flush_action == DATA_ACTION)
-		err = floor_c_data_report_t(
-			pfloor_counter->accumulated_floor_count, 2,
-			(int64_t)event->time_stamp);
+		err = floor_c_data_report(
+			pfloor_counter->accumulated_floor_count, 2);
 	return err;
 }
 

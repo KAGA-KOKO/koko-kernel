@@ -37,9 +37,9 @@
 #include <linux/notifier.h>
 #include "scp_helper.h"
 
-enum ANCALLHUB_TRC {
+typedef enum {
 	ANCALLHUBH_TRC_INFO = 0X10,
-};
+} ANCALLHUB_TRC;
 
 static struct situation_init_info ancallhub_init_info;
 
@@ -87,8 +87,7 @@ static int answer_call_recv_data(struct data_unit_t *event, void *reserved)
 	if (event->flush_action == FLUSH_ACTION)
 		pr_debug("answer_call do not support flush\n");
 	else if (event->flush_action == DATA_ACTION)
-		err = situation_notify_t(ID_ANSWER_CALL,
-				(int64_t)event->time_stamp);
+		err = situation_notify(ID_ANSWER_CALL);
 	return err;
 }
 

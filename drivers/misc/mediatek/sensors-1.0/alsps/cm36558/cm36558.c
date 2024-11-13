@@ -23,7 +23,6 @@
 #include <linux/of_irq.h>
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
-#include <linux/sched/clock.h>
 #include "cust_alsps.h"
 #include "cm36558.h"
 #include "alsps.h"
@@ -199,7 +198,7 @@ int CM36558_i2c_master_operate(struct i2c_client *client, char *buf, int count,
 #endif
 		break;
 	default:
-		pr_debug("%s i2c_flag not support!\n", __func__);
+		pr_debug("CM36558_i2c_master_operate i2c_flag not support!\n");
 		break;
 	}
 	if (res < 0)
@@ -208,7 +207,7 @@ int CM36558_i2c_master_operate(struct i2c_client *client, char *buf, int count,
 	return res;
 EXIT_ERR:
 	mutex_unlock(&CM36558_mutex);
-	pr_err("%s fail\n", __func__);
+	pr_err("CM36558_i2c_master_operate fail\n");
 	return res;
 }
 
@@ -220,7 +219,8 @@ int CM36558_enable_ps(struct i2c_client *client, int enable)
 	u8 databuf[3];
 
 	if (enable == 1) {
-		pr_debug("%s enable_ps\n", __func__);
+
+		pr_debug("CM36558_enable_ps enable_ps\n");
 		databuf[0] = CM36558_REG_PS_CONF1_2;
 		res = CM36558_i2c_master_operate(client, databuf, 2,
 						 I2C_FLAG_READ);
@@ -246,7 +246,7 @@ int CM36558_enable_ps(struct i2c_client *client, int enable)
 			jiffies + atomic_read(&obj->ps_debounce) / (1000 / HZ));
 
 	} else {
-		pr_debug("%s disable_ps\n", __func__);
+		pr_debug("CM36558_enable_ps disable_ps\n");
 		databuf[0] = CM36558_REG_PS_CONF1_2;
 		res = CM36558_i2c_master_operate(client, databuf, 2,
 						 I2C_FLAG_READ);
@@ -284,7 +284,7 @@ int CM36558_enable_als(struct i2c_client *client, int enable)
 	u8 databuf[3];
 
 	if (enable == 1) {
-		pr_debug("%s enable_als\n", __func__);
+		pr_debug("CM36558_enable_als enable_als\n");
 		databuf[0] = CM36558_REG_ALS_UV_CONF;
 		res = CM36558_i2c_master_operate(client, databuf, 2,
 						 I2C_FLAG_READ);
@@ -312,7 +312,7 @@ int CM36558_enable_als(struct i2c_client *client, int enable)
 				   atomic_read(&obj->als_debounce) /
 					   (1000 / HZ));
 	} else {
-		pr_debug("%s disable_als\n", __func__);
+		pr_debug("CM36558_enable_als disable_als\n");
 		databuf[0] = CM36558_REG_ALS_UV_CONF;
 		res = CM36558_i2c_master_operate(client, databuf, 2,
 						 I2C_FLAG_READ);
@@ -921,13 +921,14 @@ static int CM36558_check_intr(struct i2c_client *client)
 		intr_flag = 1;
 	} else {
 		res = -1;
-		pr_err("%s fail databuf[1]&0x01: %d\n", __func__, res);
+		pr_err("CM36558_check_intr fail databuf[1]&0x01: %d\n",
+			   res);
 		goto EXIT_ERR;
 	}
 
 	return 0;
 EXIT_ERR:
-	pr_err("%s dev: %d\n", __func__, res);
+	pr_err("CM36558_check_intr dev: %d\n", res);
 	return res;
 }
 
@@ -963,7 +964,7 @@ EXIT_INTR_ERR:
 #else
 	mt65xx_eint_unmask(CUST_EINT_ALS_NUM);
 #endif
-	pr_err("%s err: %d\n", __func__, res);
+	pr_err("CM36558_eint_work err: %d\n", res);
 }
 
 /*----------------------------------------------------------------------------*/
@@ -1058,7 +1059,7 @@ int CM36558_setup_eint(struct i2c_client *client)
 		}
 
 		enable_irq_wake(CM36558_obj->irq);
-		/*enable_irq(CM36558_obj->irq);*/
+		enable_irq(CM36558_obj->irq);
 	} else {
 		pr_err("null irq node!!\n");
 		return -EINVAL;
@@ -1074,7 +1075,7 @@ static int set_psensor_threshold(struct i2c_client *client)
 	int res = 0;
 	u8 databuf[3];
 
-	pr_info("%s function high: 0x%x, low:0x%x\n", __func__,
+	pr_info("set_psensor_threshold function high: 0x%x, low:0x%x\n",
 		 atomic_read(&obj->ps_thd_val_high),
 		 atomic_read(&obj->ps_thd_val_low));
 	databuf[0] = CM36558_REG_PS_THDL;
@@ -1225,7 +1226,7 @@ static int als_enable_nodata(int en)
 	}
 	res = CM36558_enable_als(CM36558_obj->client, en);
 	if (res) {
-		pr_err("%s is failed!!\n", __func__);
+		pr_err("als_enable_nodata is failed!!\n");
 		return -1;
 	}
 	return 0;
@@ -1293,9 +1294,6 @@ static int ps_enable_nodata(int en)
 		pr_err("als_enable_nodata is failed!!\n");
 		return -1;
 	}
-	/*Report default ps value(far away) when enable ps*/
-	if (en != 0)
-		ps_data_report(1, 3);
 	return 0;
 }
 

@@ -16,55 +16,9 @@
 #include "inc/mag.h"
 #include "sensor_performance.h"
 #include <linux/vmalloc.h>
-#ifdef ODM_WT_EDIT
-// LiTao@ODM_WT.BSP.Sensors.Config, 2019/11/07, Add for judging if has nfc
-#include <soc/oppo/oppo_project.h>
-#endif /* ODM_WT_EDIT */
 
 struct mag_context *mag_context_obj /* = NULL*/;
 static struct mag_init_info *msensor_init_list[MAX_CHOOSE_G_NUM] = {0};
-
-#ifdef ODM_WT_EDIT
-// LiTao@ODM_WT.BSP.Sensors.Config, 2019/11/07, Add for judging if has nfc
-static bool get_nfc_config(int ov)
-{
-	bool has_nfc = false;
-
-	switch (ov) {
-	case OPERATOR_19741_RUSSIA:
-	case OPERATOR_19747_RUSSIA:
-		has_nfc = true;
-		break;
-	default:
-		break;
-	}
-
-	return has_nfc;
-}
-#endif /* ODM_WT_EDIT */
-
-#ifdef ODM_WT_EDIT
-// LiTao@ODM_WT.BSP.Sensors.Config, 2019/12/24, Add for judging if has gyro
-static bool get_gyro_config(int ov)
-{
-	bool has_gyro = false;
-
-	switch (ov) {
-	case OPERATOR_19747_ASIA_SIMPLE:
-	case OPERATOR_19747_RUSSIA:
-	case OPERATOR_19747_All_BAND:
-	case OPERATOR_19747_VIETNAM_3X64G:
-	case OPERATOR_19747_VIETNAM_4X128G:
-	case OPERATOR_19747_TELECOM:
-		has_gyro = true;
-		break;
-	default:
-		break;
-	}
-
-	return has_gyro;
-}
-#endif /* ODM_WT_EDIT */
 
 static void initTimer(struct hrtimer *timer,
 		      enum hrtimer_restart (*callback)(struct hrtimer *))
@@ -172,7 +126,7 @@ static struct mag_context *mag_context_alloc_object(void)
 
 	struct mag_context *obj = kzalloc(sizeof(*obj), GFP_KERNEL);
 
-	pr_debug("%s start\n", __func__);
+	pr_debug("mag_context_alloc_object++++\n");
 	if (!obj) {
 		pr_err("Alloc magel object error!\n");
 		return NULL;
@@ -196,7 +150,7 @@ static struct mag_context *mag_context_alloc_object(void)
 	obj->enable = 0;
 	obj->delay_ns = -1;
 	obj->latency_ns = -1;
-	pr_debug("%s end\n", __func__);
+	pr_debug("mag_context_alloc_object----\n");
 	return obj;
 }
 
@@ -264,7 +218,7 @@ static int mag_enable_and_batch(void)
 		pr_debug("mag set ODR, fifo latency done\n");
 		/* start polling, if needed */
 		if (cxt->mag_ctl.is_report_input_direct == false) {
-			uint64_t mdelay = cxt->delay_ns;
+			int mdelay = cxt->delay_ns;
 
 			do_div(mdelay, 1000000);
 			atomic_set(&cxt->delay, mdelay);
@@ -299,7 +253,7 @@ static ssize_t mag_store_active(struct device *dev,
 	struct mag_context *cxt = mag_context_obj;
 	int err = 0;
 
-	pr_debug("%s buf=%s\n", __func__, buf);
+	pr_debug("mag_store_active buf=%s\n", buf);
 	mutex_lock(&mag_context_obj->mag_op_mutex);
 
 	if (!strncmp(buf, "1", 1))
@@ -307,7 +261,7 @@ static ssize_t mag_store_active(struct device *dev,
 	else if (!strncmp(buf, "0", 1))
 		cxt->enable = 0;
 	else {
-		pr_err("%s error !!\n", __func__);
+		pr_err(" mag_store_active error !!\n");
 		err = -1;
 		goto err_out;
 	}
@@ -323,7 +277,7 @@ static ssize_t mag_store_active(struct device *dev,
 
 err_out:
 	mutex_unlock(&mag_context_obj->mag_op_mutex);
-	pr_debug("%s done\n", __func__);
+	pr_debug(" mag_store_active done\n");
 	if (err)
 		return err;
 	else
@@ -349,11 +303,11 @@ static ssize_t mag_store_batch(struct device *dev,
 	struct mag_context *cxt = mag_context_obj;
 	int handle = 0, flag = 0, err = 0;
 
-	pr_debug("%s %s\n", __func__, buf);
+	pr_debug(" acc_store_batch %s\n", buf);
 	err = sscanf(buf, "%d,%d,%lld,%lld", &handle, &flag, &cxt->delay_ns,
 		     &cxt->latency_ns);
 	if (err != 4) {
-		pr_err("%s param error: err = %d\n", __func__, err);
+		pr_err("mag_store_batch param error: err = %d\n", err);
 		return -1;
 	}
 
@@ -369,7 +323,7 @@ static ssize_t mag_store_batch(struct device *dev,
 	err = mag_enable_and_batch();
 #endif
 	mutex_unlock(&mag_context_obj->mag_op_mutex);
-	pr_debug("%s done: %d\n", __func__, cxt->is_batch_enable);
+	pr_debug(" mag_store_batch done: %d\n", cxt->is_batch_enable);
 	if (err)
 		return err;
 	else
@@ -400,9 +354,9 @@ static ssize_t mag_store_flush(struct device *dev,
 
 	err = kstrtoint(buf, 10, &handle);
 	if (err != 0)
-		pr_err("%s param error: err = %d\n", __func__, err);
+		pr_err("mag_store_flush param error: err = %d\n", err);
 
-	pr_debug("%s param: handle %d\n", __func__, handle);
+	pr_debug("mag_store_flush param: handle %d\n", handle);
 
 	mutex_lock(&mag_context_obj->mag_op_mutex);
 	cxt = mag_context_obj;
@@ -471,67 +425,15 @@ static ssize_t mag_show_libinfo(struct device *dev,
 	return sizeof(struct mag_libinfo_t);
 }
 
-#ifdef ODM_WT_EDIT
-// LiTao@ODM_WT.BSP.Sensors.Config, 2019/11/07, Add for judging if has nfc
-static ssize_t mag_show_has_nfc(struct device *dev,
-				struct device_attribute *attr, char *buf)
-{
-	bool has_nfc = false;
-	int oppo_op_version = 0;
-
-	if (!buf)
-		return -1;
-
-	oppo_op_version = get_Operator_Version();
-
-	printk(KERN_ERR "[MAG] %s oppo operation version is %d\n", __func__, oppo_op_version);
-
-	if (!oppo_op_version)
-		return -1;
-
-	has_nfc = get_nfc_config(oppo_op_version);
-
-	printk(KERN_ERR "[MAG] %s has_nfc is %d\n", __func__, has_nfc);
-
-	return snprintf(buf, PAGE_SIZE, "%d\n", has_nfc);
-}
-#endif /* ODM_WT_EDIT */
-
-#ifdef ODM_WT_EDIT
-// LiTao@ODM_WT.BSP.Sensors.Config, 2019/12/24, Add for judging if has gyro
-static ssize_t mag_show_has_gyro(struct device *dev,
-				struct device_attribute *attr, char *buf)
-{
-	bool has_gyro = false;
-	int oppo_op_version = 0;
-
-	if (!buf)
-		return -1;
-
-	oppo_op_version = get_Operator_Version();
-
-	printk(KERN_ERR "[MAG] %s oppo operation version is %d\n", __func__, oppo_op_version);
-
-	if (!oppo_op_version)
-		return -1;
-
-	has_gyro = get_gyro_config(oppo_op_version);
-
-	printk(KERN_ERR "[MAG] %s has_gyro is %d\n", __func__, has_gyro);
-
-	return snprintf(buf, PAGE_SIZE, "%d\n", has_gyro);
-}
-#endif /* ODM_WT_EDIT */
-
 static int msensor_remove(struct platform_device *pdev)
 {
-	pr_debug("%s\n", __func__);
+	pr_debug("msensor_remove\n");
 	return 0;
 }
 
 static int msensor_probe(struct platform_device *pdev)
 {
-	pr_debug("%s\n", __func__);
+	pr_debug("msensor_probe\n");
 	return 0;
 }
 
@@ -561,7 +463,7 @@ static int mag_real_driver_init(void)
 	int i = 0;
 	int err = 0;
 
-	pr_debug("%s start\n", __func__);
+	pr_debug(" mag_real_driver_init +\n");
 	for (i = 0; i < MAX_CHOOSE_G_NUM; i++) {
 		pr_debug(" i=%d\n", i);
 		if (msensor_init_list[i] != 0) {
@@ -577,7 +479,7 @@ static int mag_real_driver_init(void)
 	}
 
 	if (i == MAX_CHOOSE_G_NUM) {
-		pr_debug("%s fail\n", __func__);
+		pr_debug(" mag_real_driver_init fail\n");
 		err = -1;
 	}
 	return err;
@@ -590,7 +492,7 @@ int mag_driver_add(struct mag_init_info *obj)
 
 	pr_debug("%s\n", __func__);
 	if (!obj) {
-		pr_err("%s fail, mag_init_info is NULL\n", __func__);
+		pr_err("MAG driver add fail, mag_init_info is NULL\n");
 		return -1;
 	}
 
@@ -667,14 +569,6 @@ DEVICE_ATTR(magflush, 0644, mag_show_flush, mag_store_flush);
 DEVICE_ATTR(magcali, 0644, mag_show_cali, mag_store_cali);
 DEVICE_ATTR(magdevnum, 0644, mag_show_sensordevnum, NULL);
 DEVICE_ATTR(maglibinfo, 0644, mag_show_libinfo, NULL);
-#ifdef ODM_WT_EDIT
-// LiTao@ODM_WT.BSP.Sensors.Config, 2019/11/07, Add for judging if has nfc
-DEVICE_ATTR(maghasnfc, 0664, mag_show_has_nfc, NULL);
-#endif /* ODM_WT_EDIT */
-#ifdef ODM_WT_EDIT
-// LiTao@ODM_WT.BSP.Sensors.Config, 2019/12/24, Add for judging if has gyro
-DEVICE_ATTR(maghasgyro, 0664, mag_show_has_gyro, NULL);
-#endif /* ODM_WT_EDIT */
 
 static struct attribute *mag_attributes[] = {
 	&dev_attr_magdev.attr,
@@ -684,14 +578,6 @@ static struct attribute *mag_attributes[] = {
 	&dev_attr_magcali.attr,
 	&dev_attr_magdevnum.attr,
 	&dev_attr_maglibinfo.attr,
-#ifdef ODM_WT_EDIT
-// LiTao@ODM_WT.BSP.Sensors.Config, 2019/11/07, Add for judging if has nfc
-	&dev_attr_maghasnfc.attr,
-#endif /* ODM_WT_EDIT */
-#ifdef ODM_WT_EDIT
-// LiTao@ODM_WT.BSP.Sensors.Config, 2019/12/24, Add for judging if has gyro
-	&dev_attr_maghasgyro.attr,
-#endif /* ODM_WT_EDIT */
 	NULL
 };
 
@@ -872,7 +758,7 @@ static int mag_probe(void)
 {
 	int err;
 
-	pr_debug("%s ++++!!\n", __func__);
+	pr_debug("+++++++++++++mag_probe!!\n");
 	mag_context_obj = mag_context_alloc_object();
 	if (!mag_context_obj) {
 		err = -ENOMEM;
@@ -887,7 +773,7 @@ static int mag_probe(void)
 		goto real_driver_init_fail;
 	}
 
-	pr_debug("%s OK !!\n", __func__);
+	pr_debug("----magel_probe OK !!\n");
 	return 0;
 
 real_driver_init_fail:
@@ -895,7 +781,7 @@ real_driver_init_fail:
 
 exit_alloc_data_failed:
 
-	pr_err("%s fail !!!\n", __func__);
+	pr_err("----magel_probe fail !!!\n");
 	return err;
 }
 

@@ -14,6 +14,11 @@
 
 #include "inc/accel_factory.h"
 
+/* Yuzhe.Peng@ODM.HQ.BSP.Sensor, 2019/10/31, Add to use MTK accelhub */
+#if (defined(VENDOR_EDIT) && defined(ODM_HQ_EDIT))
+#undef VENDOR_EDIT
+#endif
+
 struct accel_factory_private {
 	uint32_t gain;
 	uint32_t sensitivity;
@@ -67,8 +72,9 @@ static long acc_factory_unlocked_ioctl(struct file *file, unsigned int cmd,
 				pr_err("GSENSOR_IOCTL_INIT fail!\n");
 				return -EINVAL;
 			}
-			#ifdef VENDOR_EDIT
-			/*Fei.Mo@PSW.BSP.Sensor, 2017/12/18, Add for mag ata test*/
+
+			#if defined(VENDOR_EDIT) || defined(ODM_HQ_EDIT)
+			/* Yuzhe.Peng@ODM.HQ.BSP.Sensor, 2019/10/31, add for ata test in bacon */
 			msleep(500);
 			#endif /*VENDOR_EDIT*/
 			pr_debug("GSENSOR_IOCTL_INIT, enable: %d, s_p:%dms\n",
@@ -126,7 +132,7 @@ static long acc_factory_unlocked_ioctl(struct file *file, unsigned int cmd,
 		data_buf[0] = sensor_data.x;
 		data_buf[1] = sensor_data.y;
 		data_buf[2] = sensor_data.z;
-		pr_debug("GSENSOR_IOCTL_SET_CALI: (%d, %d, %d)!\n", data_buf[0],
+		pr_err("GSENSOR_IOCTL_SET_CALI: (%d, %d, %d)!\n", data_buf[0],
 			data_buf[1], data_buf[2]);
 		if (accel_factory.fops != NULL &&
 		    accel_factory.fops->set_cali != NULL) {
@@ -154,6 +160,7 @@ static long acc_factory_unlocked_ioctl(struct file *file, unsigned int cmd,
 		}
 		return 0;
 	case GSENSOR_IOCTL_GET_CALI:
+		pr_err("enter GSENSOR_IOCTL_GET_CALI\n");
 		if (accel_factory.fops != NULL &&
 		    accel_factory.fops->get_cali != NULL) {
 			err = accel_factory.fops->get_cali(data_buf);
@@ -174,6 +181,7 @@ static long acc_factory_unlocked_ioctl(struct file *file, unsigned int cmd,
 			return -EFAULT;
 		return 0;
 	case GSENSOR_IOCTL_ENABLE_CALI:
+		pr_err("enter GSENSOR_IOCTL_ENABLE_CALI\n");
 		if (accel_factory.fops != NULL &&
 		    accel_factory.fops->enable_calibration != NULL) {
 			err = accel_factory.fops->enable_calibration();

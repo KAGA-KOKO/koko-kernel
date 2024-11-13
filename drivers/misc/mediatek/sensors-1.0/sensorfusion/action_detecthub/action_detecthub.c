@@ -124,13 +124,13 @@ static int action_detecthub_local_init(void)
     ctl.is_report_input_direct = true;
     ctl.is_support_batch = false;
     #ifdef VENDOR_EDIT
-    //ctl.is_support_wake_lock = true;
+    ctl.is_support_wake_lock = true;
     #endif
 #elif defined CONFIG_NANOHUB
     ctl.is_report_input_direct = true;
     ctl.is_support_batch = false;
     #ifdef VENDOR_EDIT
-    //ctl.is_support_wake_lock = true;
+    ctl.is_support_wake_lock = true;
     #endif
 #else
 #endif

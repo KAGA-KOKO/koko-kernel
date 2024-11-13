@@ -33,14 +33,14 @@ struct platform_device *gyroPltFmDev;
 static int gyrohub_init_flag = -1;
 static DEFINE_SPINLOCK(calibration_lock);
 
-enum GYRO_TRC {
+typedef enum {
 	GYRO_TRC_FILTER = 0x01,
 	GYRO_TRC_RAWDATA = 0x02,
 	GYRO_TRC_IOCTL = 0x04,
 	GYRO_TRC_CALI = 0X08,
 	GYRO_TRC_INFO = 0X10,
 	GYRO_TRC_DATA = 0X20,
-};
+} GYRO_TRC;
 struct gyrohub_ipi_data {
 	int direction;
 	atomic_t trace;
@@ -237,7 +237,7 @@ static int gyrohub_ReadAllReg(char *buf, int bufsize)
 	return 0;
 }
 
-static ssize_t chipinfo_show(struct device_driver *ddri, char *buf)
+static ssize_t show_chipinfo_value(struct device_driver *ddri, char *buf)
 {
 	struct gyrohub_ipi_data *obj = obj_ipi_data;
 	char strbuf[GYROHUB_BUFSIZE];
@@ -260,7 +260,7 @@ static ssize_t chipinfo_show(struct device_driver *ddri, char *buf)
 	return snprintf(buf, PAGE_SIZE, "%s\n", strbuf);
 }
 
-static ssize_t sensordata_show(struct device_driver *ddri,
+static ssize_t show_sensordata_value(struct device_driver *ddri,
 	char *buf)
 {
 	struct gyrohub_ipi_data *obj = obj_ipi_data;
@@ -280,7 +280,7 @@ static ssize_t sensordata_show(struct device_driver *ddri,
 	return snprintf(buf, PAGE_SIZE, "%s\n", strbuf);
 }
 
-static ssize_t trace_show(struct device_driver *ddri, char *buf)
+static ssize_t show_trace_value(struct device_driver *ddri, char *buf)
 {
 	ssize_t res;
 	struct gyrohub_ipi_data *obj = obj_ipi_data;
@@ -294,7 +294,7 @@ static ssize_t trace_show(struct device_driver *ddri, char *buf)
 	return res;
 }
 
-static ssize_t trace_store(struct device_driver *ddri,
+static ssize_t store_trace_value(struct device_driver *ddri,
 	const char *buf, size_t count)
 {
 	struct gyrohub_ipi_data *obj = obj_ipi_data;
@@ -323,7 +323,7 @@ static ssize_t trace_store(struct device_driver *ddri,
 	return count;
 }
 
-static ssize_t status_show(struct device_driver *ddri, char *buf)
+static ssize_t show_status_value(struct device_driver *ddri, char *buf)
 {
 	ssize_t len = 0;
 	struct gyrohub_ipi_data *obj = obj_ipi_data;
@@ -336,7 +336,7 @@ static ssize_t status_show(struct device_driver *ddri, char *buf)
 	return len;
 }
 
-static ssize_t orientation_show(struct device_driver *ddri, char *buf)
+static ssize_t show_chip_orientation(struct device_driver *ddri, char *buf)
 {
 	ssize_t _tLength = 0;
 	struct gyrohub_ipi_data *obj = obj_ipi_data;
@@ -347,7 +347,7 @@ static ssize_t orientation_show(struct device_driver *ddri, char *buf)
 	return _tLength;
 }
 
-static ssize_t orientation_store(struct device_driver *ddri,
+static ssize_t store_chip_orientation(struct device_driver *ddri,
 	const char *buf, size_t tCount)
 {
 	int _nDirection = 0, ret = 0;
@@ -377,7 +377,7 @@ static ssize_t orientation_store(struct device_driver *ddri,
 }
 
 static int gyrohub_factory_enable_calibration(void);
-static ssize_t test_cali_store(struct device_driver *ddri,
+static ssize_t store_test_cali(struct device_driver *ddri,
 	const char *buf, size_t tCount)
 {
 	int enable = 0, ret = 0;
@@ -392,12 +392,13 @@ static ssize_t test_cali_store(struct device_driver *ddri,
 	return tCount;
 }
 
-static DRIVER_ATTR_RO(chipinfo);
-static DRIVER_ATTR_RO(sensordata);
-static DRIVER_ATTR_RW(trace);
-static DRIVER_ATTR_RO(status);
-static DRIVER_ATTR_RW(orientation);
-static DRIVER_ATTR_WO(test_cali);
+static DRIVER_ATTR(chipinfo, 0444, show_chipinfo_value, NULL);
+static DRIVER_ATTR(sensordata, 0444, show_sensordata_value, NULL);
+static DRIVER_ATTR(trace, 0644, show_trace_value, store_trace_value);
+static DRIVER_ATTR(status, 0444, show_status_value, NULL);
+static DRIVER_ATTR(orientation, 0644,
+	show_chip_orientation, store_chip_orientation);
+static DRIVER_ATTR(test_cali, 0644, NULL, store_test_cali);
 
 static struct driver_attribute *gyrohub_attr_list[] = {
 	&driver_attr_chipinfo,	/*chip information */
@@ -472,11 +473,11 @@ static void scp_init_work_done(struct work_struct *work)
 	cfg_data[3] = obj->static_cali[0];
 	cfg_data[4] = obj->static_cali[1];
 	cfg_data[5] = obj->static_cali[2];
-#else//VENDOR_EDIT
+#else
 	cfg_data[3] = cali_data[0];
 	cfg_data[4] = cali_data[1];
 	cfg_data[5] = cali_data[2];
-#endif//VENDOR_EDIT
+#endif /*VENDOR_EDIT*/
 	cfg_data[6] = obj->temperature_cali[0];
 	cfg_data[7] = obj->temperature_cali[1];
 	cfg_data[8] = obj->temperature_cali[2];
@@ -591,20 +592,11 @@ static int gyrohub_factory_get_data(int32_t data[3], int *status)
 }
 static int gyrohub_factory_get_raw_data(int32_t data[3])
 {
-	pr_debug("%s don't support!\n", __func__);
+	pr_debug("don't support gyrohub_factory_get_raw_data!\n");
 	return 0;
 }
-
-#ifdef ODM_WT_EDIT
-//LiTao@ODM_WT.BSP.Sensors.Config, 2019/11/30, modify for acc and gyro calibration
-static bool oppo_gyro_cali_enable = false;
-#endif
 static int gyrohub_factory_enable_calibration(void)
 {
-#ifdef ODM_WT_EDIT
-//LiTao@ODM_WT.BSP.Sensors.Config, 2019/11/30, modify for acc and gyro calibration
-	oppo_gyro_cali_enable = true;
-#endif
 	return sensor_calibration_to_hub(ID_GYROSCOPE);
 }
 static int gyrohub_factory_clear_cali(void)
@@ -663,13 +655,12 @@ static int gyrohub_factory_set_cali(int32_t data[3])
 	tx_buff[10] = 0;
 	tx_buff[11] = 0;
 	ret = sensor_cfg_to_hub(ID_GYROSCOPE, (uint8_t *)tx_buff, sizeof(tx_buff));
-
+	
 	return ret;
+#else
+	return 0;
 #endif//VENDOR_EDIT
 }
-
-#ifndef ODM_WT_EDIT
-//LiTao@ODM_WT.BSP.Sensors.Config, 2019/11/22, modify for acc and gyro calibration
 static int gyrohub_factory_get_cali(int32_t data[3])
 {
 	int err = 0;
@@ -677,7 +668,7 @@ static int gyrohub_factory_get_cali(int32_t data[3])
 	struct gyrohub_ipi_data *obj = obj_ipi_data;
 #ifndef VENDOR_EDIT
 	uint8_t status = 0;
-#endif
+#endif	
 #endif
 
 #ifdef MTK_OLD_FACTORY_CALIBRATION
@@ -691,7 +682,7 @@ static int gyrohub_factory_get_cali(int32_t data[3])
 	err = wait_for_completion_timeout(&obj->calibration_done,
 		msecs_to_jiffies(3000));
 	if (!err) {
-		pr_err("%s fail!\n", __func__);
+		pr_err("gyrohub_factory_get_cali fail!\n");
 		return -1;
 	}
 #endif
@@ -702,67 +693,14 @@ static int gyrohub_factory_get_cali(int32_t data[3])
 	spin_unlock(&calibration_lock);
 #ifndef VENDOR_EDIT
 	status = obj->static_cali_status;
-	spin_unlock(&calibration_lock);
 	if (status != 0) {
 		pr_debug("gyrohub static cali detect shake!\n");
 		return -2;
 	}
-#endif
-#endif
-	return err;
-}
-#else /* ODM_WT_EDIT */
-static int gyrohub_factory_get_cali(int32_t data[3])
-{
-	int err = 0;
-#ifndef MTK_OLD_FACTORY_CALIBRATION
-	struct gyrohub_ipi_data *obj = obj_ipi_data;
-	uint8_t status = 0;
-#endif
-
-#ifdef MTK_OLD_FACTORY_CALIBRATION
-	err = gyrohub_ReadCalibration(data);
-	if (err) {
-		pr_err("gyrohub_ReadCalibration failed!\n");
-		return -1;
-	}
-#else
-//LiTao@ODM_WT.BSP.Sensors.Config, 2019/11/30, modify for acc and gyro calibration
-	if (!oppo_gyro_cali_enable) {
-		spin_lock(&calibration_lock);
-		data[GYROHUB_AXIS_X] = obj->static_cali[GYROHUB_AXIS_X];
-		data[GYROHUB_AXIS_Y] = obj->static_cali[GYROHUB_AXIS_Y];
-		data[GYROHUB_AXIS_Z] = obj->static_cali[GYROHUB_AXIS_Z];
-		spin_unlock(&calibration_lock);
-
-		return 0;
-	}
-
-	err = wait_for_completion_timeout(&obj->calibration_done,
-		msecs_to_jiffies(6000));
-	if (!err) {
-		pr_err("%s fail!\n", __func__);
-		oppo_gyro_cali_enable = false;
-		return -1;
-	}
-	spin_lock(&calibration_lock);
-	data[GYROHUB_AXIS_X] = obj->static_cali[GYROHUB_AXIS_X];
-	data[GYROHUB_AXIS_Y] = obj->static_cali[GYROHUB_AXIS_Y];
-	data[GYROHUB_AXIS_Z] = obj->static_cali[GYROHUB_AXIS_Z];
-	status = obj->static_cali_status;
-	spin_unlock(&calibration_lock);
-
-	oppo_gyro_cali_enable = false;
-
-	if (status != 0) {
-		pr_debug("gyrohub static cali detect shake!\n");
-		return -2;
-	}
+#endif	
 #endif
 	return err;
 }
-#endif /* ODM_WT_EDIT */
-
 static int gyrohub_factory_do_self_test(void)
 {
 	int ret = 0;
@@ -821,7 +759,7 @@ static int gyrohub_enable_nodata(int en)
 		pr_err("GYROHUB_SetPowerMode fail\n");
 		return res;
 	}
-	pr_debug("%s OK!\n", __func__);
+	pr_debug("gyrohub_enable_nodata OK!\n");
 	return 0;
 
 }
@@ -867,20 +805,15 @@ static int gyrohub_set_cali(uint8_t *data, uint8_t count)
 {
 	int32_t *buf = (int32_t *)data;
 	struct gyrohub_ipi_data *obj = obj_ipi_data;
-#ifndef ODM_WT_EDIT
-// LiTao@ODM_WT.BSP.Sensors.Config, 2019/11/11, Add for gyro calibration.
 #ifdef VENDOR_EDIT
 	int cali_data[3] = {0};
 	get_sensor_parameter(ID_GYROSCOPE, cali_data);
 #endif
-#endif /*ODM_WT_EDIT*/
 
 	spin_lock(&calibration_lock);
 	obj->dynamic_cali[0] = buf[0];
 	obj->dynamic_cali[1] = buf[1];
 	obj->dynamic_cali[2] = buf[2];
-#ifndef ODM_WT_EDIT
-// LiTao@ODM_WT.BSP.Sensors.Config, 2019/11/11, Add for gyro calibration.
 #ifndef VENDOR_EDIT
 	obj->static_cali[0] = buf[3];
 	obj->static_cali[1] = buf[4];
@@ -894,12 +827,6 @@ static int gyrohub_set_cali(uint8_t *data, uint8_t count)
 	buf[4] = cali_data[1];
 	buf[5] = cali_data[2];
 #endif
-#else
-	obj->static_cali[0] = buf[3];
-	obj->static_cali[1] = buf[4];
-	obj->static_cali[2] = buf[5];
-#endif /*ODM_WT_EDIT*/
-
 	obj->temperature_cali[0] = buf[6];
 	obj->temperature_cali[1] = buf[7];
 	obj->temperature_cali[2] = buf[8];
@@ -907,7 +834,10 @@ static int gyrohub_set_cali(uint8_t *data, uint8_t count)
 	obj->temperature_cali[4] = buf[10];
 	obj->temperature_cali[5] = buf[11];
 	spin_unlock(&calibration_lock);
+
+#ifdef VENDOR_EDIT	
 	pr_err("gyrohub_set_cali::cali_data::%d %d %d\n",buf[3],buf[4],buf[5]);
+#endif	
 	return sensor_cfg_to_hub(ID_GYROSCOPE, data, count);
 }
 

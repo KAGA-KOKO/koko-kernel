@@ -498,7 +498,7 @@ static int AKECS_CheckDevice(void)
 	if ((akm_device == 0x05) || (akm_device == 0x04)) {
 		ret = AKECS_ReadFuse();
 		if (ret < 0) {
-			pr_err("%s AKM09918: read fuse fail\n", __func__);
+			pr_err("AKM09918 AKECS_CheckDevice: read fuse fail\n");
 			return -ENXIO;
 		}
 	} else if ((akm_device == 0x10) || (akm_device == 0x09) ||
@@ -1568,7 +1568,7 @@ static int akm09918_enable(int en)
 	}
 	if (f_obj->flush) {
 		if (value == 1) {
-			pr_debug("%s will call akm09918_flush\n", __func__);
+			pr_debug("will call akm09918_flush in akm09918_enable\n");
 			akm09918_flush();
 		} else
 			f_obj->flush = false;
@@ -1722,7 +1722,7 @@ static int akm09918_factory_get_data(int32_t data[3], int *status)
 }
 static int akm09918_factory_get_raw_data(int32_t data[3])
 {
-	pr_debug("%s do not support!\n", __func__);
+	pr_debug("do not support akm09918_factory_get_raw_data!\n");
 	return 0;
 }
 static int akm09918_factory_enable_calibration(void)
@@ -1775,7 +1775,7 @@ static int akm09918_i2c_probe(struct i2c_client *client,
 	struct platform_driver *paddr =
 					akm09918_init_info.platform_diver_addr;
 
-	pr_debug("%s\n", __func__);
+	pr_debug("akm09918_i2c_probe\n");
 	err = get_mag_dts_func(client->dev.of_node, hw);
 	if (err) {
 		pr_err("get dts info fail\n");
@@ -1835,7 +1835,7 @@ static int akm09918_i2c_probe(struct i2c_client *client,
 	ctl.flush = akm09918_flush;
 	ctl.is_report_input_direct = false;
 	ctl.is_support_batch = data->hw->is_batch_supported;
-	strlcpy(ctl.libinfo.libname, "akm", sizeof(ctl.libinfo.libname));
+	strlcpy(ctl.libinfo.libname, "akl", sizeof(ctl.libinfo.libname));
 	ctl.libinfo.layout = AKECS_SetCert();
 	ctl.libinfo.deviceid = akm_device;
 

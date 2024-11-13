@@ -250,7 +250,7 @@ static struct acc_context *acc_context_alloc_object(void)
 
 	struct acc_context *obj = kzalloc(sizeof(*obj), GFP_KERNEL);
 
-	pr_debug("%s start\n", __func__);
+	pr_debug("acc_context_alloc_object++++\n");
 	if (!obj) {
 		pr_err("Alloc accel object error!\n");
 		return NULL;
@@ -273,7 +273,7 @@ static struct acc_context *acc_context_alloc_object(void)
 	obj->delay_ns = -1;
 	obj->latency_ns = -1;
 	obj->open_sensor = false; /*add to control stopTimer */
-	pr_debug("%s end\n", __func__);
+	pr_debug("acc_context_alloc_object----\n");
 	return obj;
 }
 
@@ -282,7 +282,7 @@ static struct gyro_context *gyro_context_alloc_object(void)
 
 	struct gyro_context *obj = kzalloc(sizeof(*obj), GFP_KERNEL);
 
-	pr_debug("%s start\n", __func__);
+	pr_debug("gyro_context_alloc_object++++\n");
 	if (!obj) {
 		pr_err("Alloc gyro object error!\n");
 		return NULL;
@@ -305,7 +305,7 @@ static struct gyro_context *gyro_context_alloc_object(void)
 	obj->open_sensor = false; /*add to control stopTimer */
 
 	mutex_init(&obj->gyro_op_mutex);
-	pr_debug("%s end\n", __func__);
+	pr_debug("gyro_context_alloc_object----\n");
 	return obj;
 }
 
@@ -500,7 +500,7 @@ static ssize_t acc_store_active(struct device *dev,
 	struct acc_context *cxt = acc_context_obj;
 	int err = 0;
 
-	pr_debug("%s buf=%s\n", __func__, buf);
+	pr_debug("acc_store_active buf=%s\n", buf);
 	mutex_lock(&acc_context_obj->acc_op_mutex);
 	if (!strncmp(buf, "1", 1)) {
 		cxt->enable = 1;
@@ -509,7 +509,7 @@ static ssize_t acc_store_active(struct device *dev,
 		cxt->enable = 0;
 		cxt->is_active_data = false;
 	} else {
-		pr_err("%s error !!\n", __func__);
+		pr_err(" acc_store_active error !!\n");
 		err = -1;
 		goto err_out;
 	}
@@ -563,11 +563,11 @@ static ssize_t acc_store_batch(struct device *dev,
 	struct acc_context *cxt = acc_context_obj;
 	int handle = 0, flag = 0, err = 0;
 
-	pr_debug("%s %s\n", __func__, buf);
+	pr_debug(" acc_store_batch %s\n", buf);
 	err = sscanf(buf, "%d,%d,%lld,%lld", &handle, &flag, &cxt->delay_ns,
 		     &cxt->latency_ns);
 	if (err != 4) {
-		pr_debug("%s param error: err = %d\n", __func__, err);
+		pr_debug("acc_store_batch param error: err = %d\n", err);
 		return -1;
 	}
 
@@ -601,9 +601,9 @@ static ssize_t acc_store_flush(struct device *dev,
 
 	err = kstrtoint(buf, 10, &handle);
 	if (err != 0)
-		pr_debug("%s param error: err = %d\n", __func__, err);
+		pr_debug("acc_store_flush param error: err = %d\n", err);
 
-	pr_debug("%s param: handle %d\n", __func__, handle);
+	pr_debug("acc_store_flush param: handle %d\n", handle);
 
 	mutex_lock(&acc_context_obj->acc_op_mutex);
 	cxt = acc_context_obj;
@@ -833,7 +833,7 @@ static ssize_t gyro_store_active(struct device *dev,
 	struct gyro_context *cxt = gyro_context_obj;
 	int err = 0;
 
-	pr_debug("%s buf=%s\n", __func__, buf);
+	pr_debug("gyro_store_active buf=%s\n", buf);
 	mutex_lock(&gyro_context_obj->gyro_op_mutex);
 	if (!strncmp(buf, "1", 1)) {
 		cxt->enable = 1;
@@ -842,7 +842,7 @@ static ssize_t gyro_store_active(struct device *dev,
 		cxt->enable = 0;
 		cxt->is_active_data = false;
 	} else {
-		pr_err("%s error !!\n", __func__);
+		pr_err(" gyro_store_active error !!\n");
 		err = -1;
 		goto err_out;
 	}
@@ -867,7 +867,7 @@ static ssize_t gyro_store_active(struct device *dev,
 #endif
 err_out:
 	mutex_unlock(&gyro_context_obj->gyro_op_mutex);
-	pr_debug("%s done\n", __func__);
+	pr_debug(" gyro_store_active done\n");
 	return err;
 }
 
@@ -893,11 +893,11 @@ static ssize_t gyro_store_batch(struct device *dev,
 	struct gyro_context *cxt = gyro_context_obj;
 	int handle = 0, flag = 0, err = 0;
 
-	pr_debug("%s %s\n", __func__, buf);
+	pr_debug("gyro_store_batch %s\n", buf);
 	err = sscanf(buf, "%d,%d,%lld,%lld", &handle, &flag, &cxt->delay_ns,
 		     &cxt->latency_ns);
 	if (err != 4) {
-		pr_info("%s param error: err = %d\n", __func__, err);
+		pr_info("gyro_store_batch param error: err = %d\n", err);
 		return -1;
 	}
 
@@ -934,9 +934,9 @@ static ssize_t gyro_store_flush(struct device *dev,
 
 	err = kstrtoint(buf, 10, &handle);
 	if (err != 0)
-		pr_info("%s param error: err = %d\n", __func__, err);
+		pr_info("gyro_store_flush param error: err = %d\n", err);
 
-	pr_debug("%s param: handle %d\n", __func__, handle);
+	pr_debug("gyro_store_flush param: handle %d\n", handle);
 
 	mutex_lock(&gyro_context_obj->gyro_op_mutex);
 	cxt = gyro_context_obj;
@@ -1002,7 +1002,7 @@ static int accelgyro_real_driver_init(void)
 	int i = 0;
 	int err = 0;
 
-	pr_debug("%s start\n", __func__);
+	pr_debug("accelgyro_real_driver_init +\n");
 	for (i = 0; i < MAX_CHOOSE_G_NUM; i++) {
 		pr_debug(" i=%d\n", i);
 		if (accgyro_sensor_init_list[i] != 0) {
@@ -1018,7 +1018,7 @@ static int accelgyro_real_driver_init(void)
 	}
 
 	if (i == MAX_CHOOSE_G_NUM) {
-		pr_debug("%s fail\n", __func__);
+		pr_debug(" acc_real_driver_init fail\n");
 		err = -1;
 	}
 	return err;
@@ -1410,7 +1410,7 @@ static int accelgyro_probe(void)
 {
 	int err;
 
-	pr_debug("%s+++++++++++++!!\n", __func__);
+	pr_debug("---+++++++++++++accelgyro_probe!!\n");
 	/*acc initialize */
 	acc_context_obj = acc_context_alloc_object();
 	if (!acc_context_obj) {
@@ -1452,7 +1452,7 @@ static int accelgyro_probe(void)
 		goto real_driver_init_fail;
 	}
 
-	pr_debug("%s OK !!\n", __func__);
+	pr_debug("----accelgyro_probe OK !!\n");
 	return 0;
 
 real_driver_init_fail:
@@ -1487,7 +1487,7 @@ static int accelgyro_remove(void)
 
 static int __init accelgyro_init(void)
 {
-	pr_debug("%s\n", __func__);
+	pr_debug("accelgyro_init\n");
 
 	if (accelgyro_probe()) {
 		pr_err("failed to register acc driver\n");

@@ -37,7 +37,6 @@
 /* Fuchun.Liao@BSP.CHG.Basic 2018/08/08 modify for sensor workaround */
 #include <mt-plat/mtk_boot_common.h>
 #include <mt-plat/mtk_rtc.h>
-
 extern bool oppo_gauge_get_batt_authenticate(void);
 #endif /* VENDOR_EDIT */
 
@@ -352,11 +351,8 @@ static void sensor_dev_work(struct work_struct *work)
 	int err = 0;
 	static int retry = 0;
 	struct data_unit_t data;
-#ifndef ODM_WT_EDIT
-// Jixiaopan@ODM_WT.BSP.Sensors.Config, 2019/11/09, Add for bringup sensors
 	int temp_cali[6] = {0};
     int prox_cali_to_scp[3] = {0};
-#endif/*ODM_WT_EDIT*/
 	int i;
 
 	err = sensor_get_data_from_hub(ID_OPPO_SENSOR, &data);
@@ -371,12 +367,6 @@ static void sensor_dev_work(struct work_struct *work)
 		if (!light_init && !mag_init)
 		{
 			if(get_boot_mode() == NORMAL_BOOT
-#ifdef ODM_WT_EDIT
-/* Sidong.Zhao@BSP.CHG.Basic 2019/11/05 cause kernel panic */
-			&& (0)
-#else		
-			&& oppo_gauge_get_batt_authenticate() == true
-#endif /*ODM_WT_EDIT*/
 			&& oppo_get_rtc_sensor_cause_panic_value() == 0)
 			{
 				for (i = 0; i < ARRAY_SIZE(sensor_i2c_gpios); i++)
@@ -407,12 +397,10 @@ static void sensor_dev_work(struct work_struct *work)
 		}
 		oppo_clear_rtc_sensor_cause_panic();
 #endif /* VENDOR_EDIT */
-#ifdef ODM_WT_EDIT
-// Jixiaopan@ODM_WT.BSP.Sensors.Config, 2019/11/09, Add for bringup sensors
-		DEVINF_ERR("nothing to do\n");
-#else
 		get_sensor_parameter(ID_LIGHT, temp_cali);
+#ifndef ODM_WT_EDIT
 		err = sensor_set_cmd_to_hub(ID_LIGHT, CUST_ACTION_SET_CALI, (void*)&temp_cali[0]);
+#endif
 		DEVINF_ERR("set als factory cali=%d, res=%d\n",temp_cali[0], err);
 		msleep(20);
 		get_sensor_parameter(ID_PROXIMITY, temp_cali);
@@ -421,11 +409,11 @@ static void sensor_dev_work(struct work_struct *work)
 			prox_cali_to_scp[0] = (temp_cali[3] << 16) | temp_cali[0];
 			prox_cali_to_scp[1] = (temp_cali[4] << 16) | temp_cali[1];
 			prox_cali_to_scp[2] = (temp_cali[5] << 16) | temp_cali[2];
-
+#ifndef ODM_WT_EDIT
 			err = sensor_set_cmd_to_hub(ID_PROXIMITY, CUST_ACTION_SET_CALI, (void*)prox_cali_to_scp);
+#endif
 			DEVINF_ERR("set ps factory cali (%d %d %d, %d %d %d), res=%d\n", temp_cali[0], temp_cali[1], temp_cali[2], temp_cali[3], temp_cali[4], temp_cali[5], err);
 		}
-#endif/*ODM_WT_EDIT*/
 	}
 RETRY_GET_SENSOR:
 	if ((retry < 3) && err) {
@@ -450,10 +438,8 @@ static int __init sensordev_init(void)
 	init_sensor_calibraiton_paramater();
 
 	INIT_DELAYED_WORK(&sensor_work, sensor_dev_work);
-#ifndef ODM_WT_EDIT
-//Li Tao@ODM_WT.BSP.Sensors.Config, 2020/03/10, Add for fixing crash issue
 	schedule_delayed_work(&sensor_work, msecs_to_jiffies(SENSOR_DEVINFO_SYNC_FIRST_TIME));
-#endif
+
 	return 0;
 }
 

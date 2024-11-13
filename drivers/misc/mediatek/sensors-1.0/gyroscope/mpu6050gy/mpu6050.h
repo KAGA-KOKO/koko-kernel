@@ -20,8 +20,7 @@
 #define MPU6050_ACCESS_BY_GSE_I2C
 
 #ifdef MPU6050_ACCESS_BY_GSE_I2C
-/* mtk i2c not allow to probe two same address */
-#define MPU6050_I2C_SLAVE_ADDR		(0xD2)
+#define MPU6050_I2C_SLAVE_ADDR		(0xD2)	/* mtk i2c not allow to probe two same address */
 #else
 #define MPU6050_I2C_SLAVE_ADDR		0xD0
 #endif
@@ -34,9 +33,10 @@
 #define MPU6050_REG_AUX_VDD         0x01
 
 #define MPU6050_REG_SAMRT_DIV       0x19
+/* set external sync, full-scale range and sample rate, low pass filter bandwidth */
 #define MPU6050_REG_CFG             0x1A
-/* full-scale range and sample rate, */
-#define MPU6050_REG_GYRO_CFG        0x1B
+#define MPU6050_REG_GYRO_CFG        0x1B	/* full-scale range and sample rate, */
+
 
 #define MPU6050_REG_GYRO_XH         0x43
 
@@ -52,26 +52,20 @@
 
 
 /*MPU6050 Register Bit definitions*/
-/* insert the X Gyro data into FIFO */
-#define MPU6050_FIFO_GYROX_EN       0x40
-/* insert the Y Gyro data into FIFO */
-#define MPU6050_FIFO_GYROY_EN       0x20
-/* insert the Z Gyro data into FIFO */
-#define MPU6050_FIFO_GYROZ_EN       0x10
-/* disable VDD level for the secondary I2C bus clock and data lines */
-#define MPU6050_AUX_VDDIO_DIS       0x00
+
+#define MPU6050_FIFO_GYROX_EN       0x40	/* insert the X Gyro data into FIFO */
+#define MPU6050_FIFO_GYROY_EN       0x20	/* insert the Y Gyro data into FIFO */
+#define MPU6050_FIFO_GYROZ_EN       0x10	/* insert the Z Gyro data into FIFO */
+
+#define MPU6050_AUX_VDDIO_DIS       0x00	/* disable VDD level for the secondary I2C bus clock and data lines */
 
 /* for MPU6050_REG_CFG */
-/*
- * 0x05  captue the state of external frame sync
- * input pin to insert into LSB of registers
- */
+/* 0x05  //captue the state of external frame sync input pin to insert into LSB of registers */
 #define MPU6050_EXT_SYNC			0x03
 #define MPU6050_SYNC_GYROX			0x02
 
 /* for MPU6050_REG_GYRO_CFG */
-/* set the full-scale range of the gyro sensors */
-#define MPU6050_FS_RANGE			0x03
+#define MPU6050_FS_RANGE			0x03	/* set the full-scale range of the gyro sensors */
 #define MPU6050_FS_1000				0x02
 
 
@@ -80,12 +74,12 @@
 
 #define MPU6050_RATE_1K_LPFB_188HZ	0x01
 #define MPU6050_RATE_1K_LPFB_256HZ	0x00
-/* enable FIFO operation for sensor data */
-#define MPU6050_FIFO_EN				0x40
-/* reset FIFO function */
-#define MPU6050_FIFO_RST			0x40
-/* enable low power sleep mode */
-#define MPU6050_SLEEP               0x40
+
+#define MPU6050_FIFO_EN				0x40	/* enable FIFO operation for sensor data */
+
+#define MPU6050_FIFO_RST			0x40	/* reset FIFO function */
+
+#define MPU6050_SLEEP               0x40	/* enable low power sleep mode */
 
 
 

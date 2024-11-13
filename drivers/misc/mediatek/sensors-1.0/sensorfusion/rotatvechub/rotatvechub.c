@@ -21,9 +21,9 @@
 #include <linux/notifier.h>
 #include "scp_helper.h"
 
-enum ROTVECHUB_TRC {
+typedef enum {
 	ROTVECHUB_TRC_INFO = 0X10,
-};
+} ROTVECHUB_TRC;
 
 static struct fusion_init_info rotatvechub_init_info;
 

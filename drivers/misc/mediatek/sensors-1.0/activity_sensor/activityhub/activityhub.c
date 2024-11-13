@@ -22,9 +22,9 @@
 #include <linux/notifier.h>
 #include "scp_helper.h"
 
-enum ACTHUB_TRC {
+typedef enum {
 	ACTHUB_TRC_INFO = 0X10,
-};
+} ACTHUB_TRC;
 
 static struct act_init_info activityhub_init_info;
 

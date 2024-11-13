@@ -101,7 +101,7 @@ static int ffd_recv_data(struct data_unit_t *event, void *reserved)
         event->flush_action, event->ffd_data_t.value, event->ffd_data_t.report_count, (int64_t)event->time_stamp);
 
 #ifdef CONFIG_OPPO_MOTOR
-// for motor down if freefall
+    // for motor down if freefall
     if (event->ffd_data_t.value) {
         oppo_motor_downward();
     }
