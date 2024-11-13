@@ -61,7 +61,6 @@ static long sil_stub_ioctl(struct file *filp, unsigned int cmd, unsigned long ar
     unsigned long flags;
     struct sil_stub_dev	*stub_dev;
     long err = 0, ret = 0;
-
     if(_IOC_TYPE(cmd) != SIFP_IOC_MAGIC)
         return -EINVAL;
 
@@ -74,13 +73,13 @@ static long sil_stub_ioctl(struct file *filp, unsigned int cmd, unsigned long ar
         err = !access_ok(VERIFY_READ, (void*)arg, _IOC_SIZE(cmd));
 
     stub_dev = filp->private_data;
-    LOG_MSG_DEBUG(INFO_LOG, "[%s] send cmd %d\n", __func__, cmd);
+    LOG_MSG_DEBUG(ERR_LOG, "[%s] send cmd %d\n", __func__, cmd);
     switch(cmd) {
     case SIL_STUB_IOCINIT:
         spin_lock_irqsave(&stub_dev->lock, flags);
         if (stub_dev->fp_init) {
             spin_unlock_irqrestore(&stub_dev->lock, flags);
-            LOG_MSG_DEBUG(INFO_LOG, "[%s] silead_fp already inited\n", __func__);
+            LOG_MSG_DEBUG(ERR_LOG, "[%s] silead_fp already inited\n", __func__);
             break;
         } else {
             stub_dev->fp_init = 1;
@@ -95,11 +94,10 @@ static long sil_stub_ioctl(struct file *filp, unsigned int cmd, unsigned long ar
         }
         break;
     case SIL_STUB_IOCDEINIT:
-		LOG_MSG_DEBUG(ERR_LOG, "[%s] silfp SIL_STUB_IOCDEINIT.\n", __func__);
         spin_lock_irqsave(&stub_dev->lock, flags);
         if (!stub_dev->fp_init) {
             spin_unlock_irqrestore(&stub_dev->lock, flags);
-            LOG_MSG_DEBUG(INFO_LOG, "[%s] silead_fp already released\n", __func__);
+            LOG_MSG_DEBUG(ERR_LOG, "[%s] silead_fp already released\n", __func__);
             break;
         } else {
             stub_dev->fp_init = 0;
@@ -122,6 +120,7 @@ sil_stub_compat_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 #else
 #define sil_stub_compat_ioctl NULL
 #endif /* CONFIG_COMPAT */
+
 
 struct file_operations sil_stub_fops = {
     .owner   = THIS_MODULE,
@@ -162,7 +161,6 @@ static int __init silead_stub_init(void)
     sil_stub_class = class_create(THIS_MODULE, FP_STUB_CLASS_NAME);
     device_create(sil_stub_class, NULL,sil_stub_devp->devt, NULL, FP_STUB_DEV_NAME);
     spin_lock_init(&sil_stub_devp->lock);
-
     return ret;
 }
 

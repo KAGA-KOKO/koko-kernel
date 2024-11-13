@@ -41,8 +41,8 @@
 #endif	/* !defined(CONFIG_MTK_CLKMGR) */
 
 #if (!defined(CONFIG_SILEAD_FP_PLATFORM))
-//#include "mt_spi.h"
-//#include "mt_spi_hal.h"
+//#include "mtk_spi.h"
+//#include "mtk_spi_hal.h"
 
 struct mt_spi_t {
     struct platform_device *pdev;
@@ -70,8 +70,8 @@ extern void mt_spi_disable_master_clk(struct spi_device *spidev);
 #endif /* !__MTK_SPI_HAL_H__ */
 #endif /* !CONFIG_SILEAD_FP_PLATFORM */
 
-#define FP_IRQ_OF  "mediatek,finger-fp"
-#define FP_PINS_OF "mediatek,finger-fp"
+#define FP_IRQ_OF  "mediatek,silead_fp"
+#define FP_PINS_OF "mediatek,silead_fp"
 
 const static uint8_t TANAME[] = { 0x51, 0x1E, 0xAD, 0x0D, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
@@ -85,7 +85,7 @@ static int silfp_input_init(struct silfp_data *fp_dev);
 static void silfp_hw_poweron(struct silfp_data *fp_dev)
 {
     int err = 0;
-    //LOG_MSG_DEBUG(INFO_LOG, "[%s] enter.\n", __func__);
+    //LOG_MSG_DEBUG(ERR_LOG, "[%s] enter.\n", __func__);
 
 #ifdef BSP_SIL_POWER_SUPPLY_REGULATOR
     /* Power control by Regulators(LDO) */
@@ -101,18 +101,14 @@ static void silfp_hw_poweron(struct silfp_data *fp_dev)
 
 #ifdef BSP_SIL_POWER_SUPPLY_PINCTRL
     /* Power control by GPIOs */
-/*
     if ( fp_dev->pin.pins_avdd_h ) {
         err = pinctrl_select_state(fp_dev->pin.pinctrl, fp_dev->pin.pins_avdd_h);
     }
     if ( fp_dev->pin.pins_vddio_h ) {
         err = pinctrl_select_state(fp_dev->pin.pinctrl, fp_dev->pin.pins_vddio_h);
-    }*/
-    if ( fp_dev->pin.pins_power_h ) {
-        err = pinctrl_select_state(fp_dev->pin.pinctrl, fp_dev->pin.pins_power_h);
     }
-	mdelay(5);
 #endif /* BSP_SIL_POWER_SUPPLY_PINCTRL */
+
 
 #ifdef BSP_SIL_POWER_SUPPLY_GPIO
     if ( fp_dev->avdd_port > 0 ) {
@@ -123,12 +119,12 @@ static void silfp_hw_poweron(struct silfp_data *fp_dev)
     }
 #endif /* BSP_SIL_POWER_SUPPLY_GPIO */
     fp_dev->power_is_off = 0;
-    LOG_MSG_DEBUG(INFO_LOG, "%s: power supply ret:%d \n", __func__, err);
+    LOG_MSG_DEBUG(ERR_LOG, "%s: power supply ret:%d \n", __func__, err);
 }
 
 static void silfp_hw_poweroff(struct silfp_data *fp_dev)
 {
-    LOG_MSG_DEBUG(INFO_LOG, "[%s] enter.\n", __func__);
+    LOG_MSG_DEBUG(ERR_LOG, "[%s] enter.\n", __func__);
 #ifdef BSP_SIL_POWER_SUPPLY_REGULATOR
     /* Power control by Regulators(LDO) */
     if ( fp_dev->avdd_ldo && (regulator_is_enabled(fp_dev->avdd_ldo) > 0)) {
@@ -158,7 +154,7 @@ static void silfp_hw_poweroff(struct silfp_data *fp_dev)
 
 static void silfp_power_deinit(struct silfp_data *fp_dev)
 {
-    LOG_MSG_DEBUG(INFO_LOG, "[%s] enter.\n", __func__);
+    LOG_MSG_DEBUG(ERR_LOG, "[%s] enter.\n", __func__);
 #ifdef BSP_SIL_POWER_SUPPLY_REGULATOR
     /* Power control by Regulators(LDO) */
     if ( fp_dev->avdd_ldo ) {
@@ -175,10 +171,8 @@ static void silfp_power_deinit(struct silfp_data *fp_dev)
 
 #ifdef BSP_SIL_POWER_SUPPLY_PINCTRL
     /* Power control by GPIOs */
-	devm_pinctrl_put(fp_dev->pin.pinctrl);
-
-    fp_dev->pin.pins_power_h = NULL;
-   // fp_dev->pin.pins_vddio_h = NULL;
+    fp_dev->pin.pins_avdd_h = NULL;
+    fp_dev->pin.pins_vddio_h = NULL;
 #endif /* BSP_SIL_POWER_SUPPLY_PINCTRL */
 
 #ifdef BSP_SIL_POWER_SUPPLY_GPIO
@@ -200,7 +194,7 @@ static void silfp_power_deinit(struct silfp_data *fp_dev)
 /* -------------------------------------------------------------------- */
 static void silfp_hw_reset(struct silfp_data *fp_dev, u8 delay)
 {
-    LOG_MSG_DEBUG(INFO_LOG, "[%s] enter, port=%d\n", __func__, fp_dev->rst_port);
+    LOG_MSG_DEBUG(ERR_LOG, "[%s] enter, port=%d\n", __func__, fp_dev->rst_port);
 
     //if ( fp_dev->rst_port > 0 ) {
     pinctrl_select_state(fp_dev->pin.pinctrl, fp_dev->pin.pins_rst_l);
@@ -221,7 +215,7 @@ static void silfp_hw_reset(struct silfp_data *fp_dev, u8 delay)
 /* -------------------------------------------------------------------- */
 static void silfp_pwdn(struct silfp_data *fp_dev, u8 flag_avdd)
 {
-    LOG_MSG_DEBUG(INFO_LOG, "[%s] enter, port=%d\n", __func__, fp_dev->rst_port);
+    LOG_MSG_DEBUG(ERR_LOG, "[%s] enter, port=%d\n", __func__, fp_dev->rst_port);
 
     if (SIFP_PWDN_FLASH == flag_avdd) {
         silfp_hw_poweroff(fp_dev);
@@ -248,23 +242,23 @@ static int silfp_parse_dts(struct silfp_data* fp_dev)
     struct platform_device *pdev = NULL;
     int  ret;
 
-    node = of_find_compatible_node(NULL, NULL, FP_IRQ_OF);
+    node = of_find_compatible_node(NULL, NULL, "mediatek,silead_fp");
     if (node) {
         fp_dev->int_port = irq_of_parse_and_map(node, 0);
-        LOG_MSG_DEBUG(INFO_LOG, "%s, irq = %d\n", __func__, fp_dev->int_port);
+        LOG_MSG_DEBUG(ERR_LOG, "%s, irq = %d\n", __func__, fp_dev->int_port);
     } else {
         LOG_MSG_DEBUG(ERR_LOG, "%s %s compatible device node is null\n", __func__,FP_IRQ_OF);
     }
 
-    node = of_find_compatible_node(NULL, NULL, FP_PINS_OF);
+    node = of_find_compatible_node(NULL, NULL, "mediatek,silead_fp");
     if (node) {
-        LOG_MSG_DEBUG(INFO_LOG, "%s, irq = %d\n", __func__, fp_dev->int_port);
+        LOG_MSG_DEBUG(ERR_LOG, "%s, irq = %d\n", __func__, fp_dev->int_port);
         pdev = of_find_device_by_node(node);
         if (pdev) {
             fp_dev->pin.pinctrl = devm_pinctrl_get(&pdev->dev);
             if (IS_ERR(fp_dev->pin.pinctrl)) {
                 ret = PTR_ERR(fp_dev->pin.pinctrl);
-                LOG_MSG_DEBUG(ERR_LOG, "%s can't find silfp pinctrl\n", __func__);
+                LOG_MSG_DEBUG(ERR_LOG, "%s can't find silfp pinctrl,ret = %d\n", __func__,ret);
                 return ret;
             }
         } else {
@@ -274,26 +268,25 @@ static int silfp_parse_dts(struct silfp_data* fp_dev)
         LOG_MSG_DEBUG(ERR_LOG, "%s %s compatible device node is null\n", __func__,FP_PINS_OF);
         return ret;
     }
-
-    /*fp_dev->pin.pins_irq = pinctrl_lookup_state(fp_dev->pin.pinctrl, "irq-init");
+   fp_dev->pin.pins_irq = pinctrl_lookup_state(fp_dev->pin.pinctrl, "default");
     if (IS_ERR(fp_dev->pin.pins_irq)) {
         ret = PTR_ERR(fp_dev->pin.pins_irq);
         LOG_MSG_DEBUG(ERR_LOG, "%s can't find silfp irq-init\n", __func__);
         return ret;
-    }*/
-
-    fp_dev->pin.pins_rst_h = pinctrl_lookup_state(fp_dev->pin.pinctrl, "rst-high");
+    }
+    fp_dev->pin.pins_rst_h = pinctrl_lookup_state(fp_dev->pin.pinctrl, "reset_high");
     if (IS_ERR(fp_dev->pin.pins_rst_h)) {
         ret = PTR_ERR(fp_dev->pin.pins_rst_h);
         LOG_MSG_DEBUG(ERR_LOG, "%s can't find silfp rst-high\n", __func__);
         return ret;
     }
-    fp_dev->pin.pins_rst_l = pinctrl_lookup_state(fp_dev->pin.pinctrl, "rst-low");
+    fp_dev->pin.pins_rst_l = pinctrl_lookup_state(fp_dev->pin.pinctrl, "reset_low");
     if (IS_ERR(fp_dev->pin.pins_rst_l)) {
         ret = PTR_ERR(fp_dev->pin.pins_rst_l);
         LOG_MSG_DEBUG(ERR_LOG, "%s can't find silfp rst-high\n", __func__);
         return ret;
     }
+/*
 #ifdef BSP_SIL_CTRL_SPI
     fp_dev->pin.spi_default = pinctrl_lookup_state(fp_dev->pin.pinctrl, "spi-default");
     if (IS_ERR(fp_dev->pin.spi_default)) {
@@ -302,28 +295,28 @@ static int silfp_parse_dts(struct silfp_data* fp_dev)
         return ret;
     }
     pinctrl_select_state(fp_dev->pin.pinctrl, fp_dev->pin.spi_default);
-#endif /* BSP_SIL_CTRL_SPI */
+#endif  BSP_SIL_CTRL_SPI */
 
     /* Get power settings */
 #ifdef BSP_SIL_POWER_SUPPLY_PINCTRL
-    fp_dev->pin.pins_power_h= pinctrl_lookup_state(fp_dev->pin.pinctrl, "power_high");
-    if (IS_ERR_OR_NULL(fp_dev->pin.pins_power_h)) {
-        fp_dev->pin.pins_power_h = NULL;
-        LOG_MSG_DEBUG(ERR_LOG, "%s can't find silfp pins_power_h\n", __func__);
+    fp_dev->pin.pins_avdd_h = pinctrl_lookup_state(fp_dev->pin.pinctrl, "avdd-enable");
+    if (IS_ERR_OR_NULL(fp_dev->pin.pins_avdd_h)) {
+        fp_dev->pin.pins_avdd_h = NULL;
+        LOG_MSG_DEBUG(ERR_LOG, "%s can't find silfp avdd-enable\n", __func__);
         // Ignore error
     }
 
-    fp_dev->pin.pins_power_l= pinctrl_lookup_state(fp_dev->pin.pinctrl, "power_low");
-    if (IS_ERR_OR_NULL(fp_dev->pin.pins_power_l)) {
-        fp_dev->pin.pins_power_l = NULL;
-        LOG_MSG_DEBUG(ERR_LOG, "%s can't find silfp pins_power_l\n", __func__);
+    fp_dev->pin.pins_vddio_h = pinctrl_lookup_state(fp_dev->pin.pinctrl, "vddio-enable");
+    if (IS_ERR_OR_NULL(fp_dev->pin.pins_vddio_h)) {
+        fp_dev->pin.pins_vddio_h = NULL;
+        LOG_MSG_DEBUG(ERR_LOG, "%s can't find silfp vddio-enable\n", __func__);
         // Ignore error
     }
 #endif /* BSP_SIL_POWER_SUPPLY_PINCTRL */
 
 #ifdef BSP_SIL_POWER_SUPPLY_REGULATOR
     // Todo: use correct settings.
-    fp_dev->avdd_ldo = regulator_get(&fp_dev->spi->dev, "avdd");
+    fp_dev->avdd_ldo = regulator_get(&fp_dev->spi->dev, "vmch");
     fp_dev->vddio_ldo= regulator_get(&fp_dev->spi->dev, "vddio");
 #endif /* BSP_SIL_POWER_SUPPLY_REGULATOR */
 
@@ -362,38 +355,31 @@ static int silfp_set_spi(struct silfp_data *fp_dev, bool enable)
     } else if (atomic_read(&fp_dev->spionoff_count)) {
         atomic_dec(&fp_dev->spionoff_count);
         disable_clock(MT_CG_PERI_SPI0, "spi");
-    } else {
-        LOG_MSG_DEBUG(ERR_LOG, "unpaired enable/disable %d [%s]\n",enable, __func__);
     }
-    LOG_MSG_DEBUG(ERR_LOG, "[%s] done\n",__func__);
+    LOG_MSG_DEBUG(DBG_LOG, "[%s] done\n",__func__);
 #else
     int ret = -ENOENT;
-    //struct mt_spi_t *ms = NULL;
-	LOG_MSG_DEBUG(ERR_LOG, "[%s] start\n", __func__);
-   // ms = spi_master_get_devdata(fp_dev->spi->master);
+    struct mt_spi_t *ms = NULL;
+    ms = spi_master_get_devdata(fp_dev->spi->master);
 
-    if ( !fp_dev->pin.spi_id /*|| !ms*/ ) {
+    if ( /*!fp_dev->pin.spi_id || */ !ms ) {
         LOG_MSG_DEBUG(ERR_LOG, "%s: not support\n", __func__);
         return ret;
     }
 
     if ( enable && !atomic_read(&fp_dev->spionoff_count) ) {
         atomic_inc(&fp_dev->spionoff_count);
-        	//clk_prepare_enable(ms->clk_main);
-        //ret = clk_enable(ms->clk_main);
-        mt_spi_enable_master_clk(fp_dev->spi);
-		ret = 1;
+        /*	clk_prepare_enable(ms->clk_main); */
+        /*ret = clk_enable(ms->clk_main);*/
+         ret = mt_spi_enable_master_clk(fp_dev->spi); 
     } else if (atomic_read(&fp_dev->spionoff_count)) {
         atomic_dec(&fp_dev->spionoff_count);
-        	//clk_disable_unprepare(ms->clk_main); 
-        //clk_disable(ms->clk_main);
-        mt_spi_disable_master_clk(fp_dev->spi);
-        ret = 0;
-    } else {
-        LOG_MSG_DEBUG(ERR_LOG, "unpaired enable/disable %d [%s]\n",enable, __func__);
+        /*	clk_disable_unprepare(ms->clk_main); */
+        /*clk_disable(ms->clk_main);*/
+         mt_spi_disable_master_clk(fp_dev->spi); 
         ret = 0;
     }
-    LOG_MSG_DEBUG(ERR_LOG, "[%s] done (%d).\n",__func__,ret);
+    LOG_MSG_DEBUG(DBG_LOG, "[%s] done (%d).\n",__func__,ret);
 #endif /* CONFIG_MTK_CLKMGR */
 #endif /* !CONFIG_MT_SPI_FPGA_ENABLE */
 #else
@@ -435,7 +421,7 @@ static int silfp_set_feature(struct silfp_data *fp_dev, u8 feature)
 
     switch (feature) {
     case FEATURE_FLASH_CS:
-        LOG_MSG_DEBUG(INFO_LOG, "%s set feature flash cs\n", __func__);
+        LOG_MSG_DEBUG(ERR_LOG, "%s set feature flash cs\n", __func__);
         ret = silfp_irq_to_reset_init(fp_dev);
         break;
 
@@ -459,11 +445,10 @@ static int silfp_resource_init(struct silfp_data *fp_dev, struct fp_dev_init_t *
     fp_dev->irq_no_use = 0;
     silfp_parse_dts(fp_dev);
     silfp_hw_poweron(fp_dev);
-	pinctrl_select_state(fp_dev->pin.pinctrl, fp_dev->pin.pins_rst_h);
-	LOG_MSG_DEBUG(INFO_LOG, "[%s] reset pull high\n");
+    mdelay(5);
     /*fp_dev->int_port = of_get_named_gpio(fp_dev->spi->dev.of_node, "irq-gpios", 0);
     fp_dev->rst_port = of_get_named_gpio(fp_dev->spi->dev.of_node, "rst-gpios", 0); */
-    LOG_MSG_DEBUG(INFO_LOG, "[%s] int_port %d, rst_port %d.\n",__func__,fp_dev->int_port,fp_dev->rst_port);
+    LOG_MSG_DEBUG(ERR_LOG, "[%s] int_port %d, rst_port %d.\n",__func__,fp_dev->int_port,fp_dev->rst_port);
     /*if (fp_dev->int_port > 0 ) {
         gpio_free(fp_dev->int_port);
     }
@@ -471,7 +456,7 @@ static int silfp_resource_init(struct silfp_data *fp_dev, struct fp_dev_init_t *
     if (fp_dev->rst_port > 0 ) {
         gpio_free(fp_dev->rst_port);
     }*/
-    //pinctrl_select_state(fp_dev->pin.pinctrl, fp_dev->pin.pins_irq);
+    pinctrl_select_state(fp_dev->pin.pinctrl, fp_dev->pin.pins_irq);
     fp_dev->irq = fp_dev->int_port; //gpio_to_irq(fp_dev->int_port);
     fp_dev->irq_is_disable = 0;
 
@@ -485,7 +470,7 @@ static int silfp_resource_init(struct silfp_data *fp_dev, struct fp_dev_init_t *
         status = -ENODEV;
         goto err_irq;
     } else {
-        LOG_MSG_DEBUG(INFO_LOG,"[%s] Enable_irq_wake.\n",__func__);
+        LOG_MSG_DEBUG(ERR_LOG,"[%s] Enable_irq_wake.\n",__func__);
         enable_irq_wake(fp_dev->irq);
         silfp_irq_disable(fp_dev);
     }

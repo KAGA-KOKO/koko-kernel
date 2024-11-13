@@ -36,21 +36,17 @@ typedef enum {
         FP_FPC_1140,
         FP_FPC_1260,
         FP_FPC_1270,
+        FP_GOODIX_5658,
         FP_FPC_1511,
-        FP_FPC_1541,
-        FP_FPC_1023_GLASS,
         FP_GOODIX_3268,
-        FP_GOODIX_3626,
         FP_GOODIX_5288,
         FP_GOODIX_5298,
         FP_GOODIX_5228,
-        FP_GOODIX_5658,
         FP_GOODIX_OPTICAL_95,
         FP_GOODIX_5298_GLASS,
-        FP_SILEAD_6150,
         FP_SILEAD_OPTICAL_70,
-        FP_EGIS_520,
-        FP_EGIS_OPTICAL_ET713,
+        FP_FPC_1023_GLASS,
+	FP_EGIS_OPTICAL_ET713,
         FP_UNKNOWN,
 } fp_vendor_t;
 
@@ -62,12 +58,6 @@ enum {
 
 struct fp_data {
         struct device *dev;
-#if CONFIG_OPPO_FINGERPRINT_PLATFORM == 6768
-        struct platform_device *pdev;
-        struct pinctrl *gpio_id0_pinctrl;
-        struct pinctrl_state *gpio_id0_pull_up;
-        struct pinctrl_state *gpio_id0_pull_down;
-#endif
         int gpio_id0;
         int gpio_id1;
         int gpio_id2;
