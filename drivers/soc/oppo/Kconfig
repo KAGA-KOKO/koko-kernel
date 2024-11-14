@@ -23,7 +23,7 @@ source "drivers/soc/oppo/oppo_hypnus/Kconfig"
 source "drivers/soc/oppo/oppo_custom/Kconfig"
 source "drivers/soc/oppo/oppo_healthinfo/Kconfig"
 source "drivers/soc/oppo/oppo_als_cali_value/Kconfig"
-
+source "drivers/soc/oppo/oppo_shutdown_detect/Kconfig"
 
 #ifdef VENDOR_EDIT
 #//Kun.Hu@PSW.TECH 2018/11/15, Add phoenix base

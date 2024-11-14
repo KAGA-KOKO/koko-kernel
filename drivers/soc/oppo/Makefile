@@ -4,7 +4,7 @@ obj-$(CONFIG_OPPO_CUSTOM)  += oppo_custom/
 obj-$(CONFIG_OPPO_HYPNUS)     +=  oppo_hypnus/
 obj-$(CONFIG_OPPO_HEALTHINFO)     +=  oppo_healthinfo/
 obj-$(CONFIG_OPPO_ALS_CALI)   +=  oppo_als_cali_value/
-
+obj-$(CONFIG_OPPO_SHUTDOWN_DETECT)	+=  oppo_shutdown_detect/
 #ifdef VENDOR_EDIT
 #Weican.Zhao@PSW.NW.EM, 2019/02/12, Add for OPPO Critical log
 #obj-$(CONFIG_OPPO_CRITICALLOG)  +=  oppo_criticallog/
@@ -23,3 +23,5 @@ endif
 #* wen.luo@PSW.BSP.kernel, 2019/6/25, Add for parsar powoff/powon */
 #obj-y     +=  oppo_lastpmic/
 #endif /* VENDOR_EDIT */
+
+
