@@ -56,64 +56,64 @@ static int getinfo_for_oppoversion(int board_id){
 
 	switch(MB){
 		case 0x00:
-			strcpy(oppoversion.operatorName, "102");
-			strcpy(oppoversion.prjVersion, "19451");
-			strcpy(oppoversion.modemType, "3");
+			strcpy(oppoversion.operatorName, "92");
+			strcpy(oppoversion.prjVersion, "19181");
+			strcpy(oppoversion.modemType, "1");
 			strcpy(oppoversion.Mboard, "0000");
 			break;
 		case 0x03:
-			strcpy(oppoversion.operatorName, "102");
-			strcpy(oppoversion.prjVersion, "19451");
-			strcpy(oppoversion.modemType, "3");
+			strcpy(oppoversion.operatorName, "92");
+			strcpy(oppoversion.prjVersion, "19181");
+			strcpy(oppoversion.modemType, "1");
 			strcpy(oppoversion.Mboard, "0001");
 			pr_err("Modify board_id : remove mobile customization\n");
 			break;
 		case 0x0c:
-			strcpy(oppoversion.operatorName, "103");
-			strcpy(oppoversion.prjVersion, "19451");
-			strcpy(oppoversion.modemType, "5");
+			strcpy(oppoversion.operatorName, "94");
+			strcpy(oppoversion.prjVersion, "19581");
+			strcpy(oppoversion.modemType, "3");
 			strcpy(oppoversion.Mboard, "0010");
 			break;
 		case 0x0f:
-			strcpy(oppoversion.operatorName, "104");
-			strcpy(oppoversion.prjVersion, "19451");
-			strcpy(oppoversion.modemType, "6");
+			strcpy(oppoversion.operatorName, "95");
+			strcpy(oppoversion.prjVersion, "19581");
+			strcpy(oppoversion.modemType, "4");
 			strcpy(oppoversion.Mboard, "0011");
 			break;
 		case 0x30:
-			strcpy(oppoversion.operatorName, "105");
-			strcpy(oppoversion.prjVersion, "19451");
-			strcpy(oppoversion.modemType, "7");
+			strcpy(oppoversion.operatorName, "96");
+			strcpy(oppoversion.prjVersion, "19581");
+			strcpy(oppoversion.modemType, "5");
 			strcpy(oppoversion.Mboard, "0100");
 			break;
 		case 0x33:
-			strcpy(oppoversion.operatorName, "106");
-			strcpy(oppoversion.prjVersion, "19451");
-			strcpy(oppoversion.modemType, "8");
+			strcpy(oppoversion.operatorName, "97");
+			strcpy(oppoversion.prjVersion, "19581");
+			strcpy(oppoversion.modemType, "6");
 			strcpy(oppoversion.Mboard, "0101");
 			break;
 		case 0x3c:
-			strcpy(oppoversion.operatorName, "107");
-			strcpy(oppoversion.prjVersion, "19451");
-			strcpy(oppoversion.modemType, "9");
+			strcpy(oppoversion.operatorName, "98");
+			strcpy(oppoversion.prjVersion, "19581");
+			strcpy(oppoversion.modemType, "7");
 			strcpy(oppoversion.Mboard, "0110");
 			break;
 		case 0x3f:
-			strcpy(oppoversion.operatorName, "108");
-			strcpy(oppoversion.prjVersion, "19451");
-			strcpy(oppoversion.modemType, "10");
+			strcpy(oppoversion.operatorName, "99");
+			strcpy(oppoversion.prjVersion, "19581");
+			strcpy(oppoversion.modemType, "8");
 			strcpy(oppoversion.Mboard, "0111");
 			break;
 		case 0xc0:
-			strcpy(oppoversion.operatorName, "109");
-			strcpy(oppoversion.prjVersion, "19451");
-			strcpy(oppoversion.modemType, "11");
+			strcpy(oppoversion.operatorName, "100");
+			strcpy(oppoversion.prjVersion, "19581");
+			strcpy(oppoversion.modemType, "9");
 			strcpy(oppoversion.Mboard, "1000");
 			break;
 		case 0xc3:
 			strcpy(oppoversion.operatorName, "101");
 			strcpy(oppoversion.prjVersion, "19581");
-			strcpy(oppoversion.modemType, "12");
+			strcpy(oppoversion.modemType, "10");
 			strcpy(oppoversion.Mboard, "1001");
 			break;
 
