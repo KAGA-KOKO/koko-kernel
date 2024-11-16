@@ -7529,7 +7529,7 @@ static void netdev_wait_allrefs(struct net_device *dev)
 					tmp = (info & 0xf0000000) >> 28;
 					if (trace_array[idx].time &&
 					    (info & 0x00ffffff)) {
-						pr_info("[mtk_net] %s: cpu%d_refcnt=%d, idx=%d, pid=%d, time=%ld\n",
+						pr_debug("[mtk_net] %s: cpu%d_refcnt=%d, idx=%d, pid=%d, time=%ld\n",
 							tmp == 1 ? "dev_put" :
 							"dev_hold",
 						  (info & 0x0f000000) >> 24,
