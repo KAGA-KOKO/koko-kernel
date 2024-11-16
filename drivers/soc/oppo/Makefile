@@ -8,7 +8,7 @@ obj-$(CONFIG_OPPO_SHUTDOWN_DETECT)	+=  oppo_shutdown_detect/
 #ifdef VENDOR_EDIT
 #Weican.Zhao@PSW.NW.EM, 2019/02/12, Add for OPPO Critical log
 #obj-$(CONFIG_OPPO_CRITICALLOG)  +=  oppo_criticallog/
-#obj-y     +=  oppo_criticallog/
+obj-y     +=  oppo_criticallog/
 #endif /* VENDOR_EDIT */
 
 #ifdef VENDOR_EDIT
