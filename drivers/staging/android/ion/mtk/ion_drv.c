@@ -697,9 +697,7 @@ static long ion_sys_ioctl(struct ion_client *client, unsigned int cmd,
 					       param.get_phys_param.
 					       kernel_handle, from_kernel);
 			if (IS_ERR(kernel_handle)) {
-				IONMSG("ION_PHYS:err handle %s(%s),%d, k:%d\n",
-				       client->name, client->dbg_name,
-				       client->pid, from_kernel);
+				IONMSG("ion_get_phys fail!\n");
 				ret = -EINVAL;
 				break;
 			}
@@ -709,9 +707,8 @@ static long ion_sys_ioctl(struct ion_client *client, unsigned int cmd,
 			    0) {
 				param.get_phys_param.phy_addr = 0;
 				param.get_phys_param.len = 0;
-				IONMSG("ION_PHYS:err PA %s(%s),%d, k:%d\n",
-				       client->name, client->dbg_name,
-				       client->pid, from_kernel);
+				IONMSG(" %s: Error. Cannot get PA.\n",
+				       __func__);
 				ret = -EFAULT;
 			}
 			param.get_phys_param.phy_addr = (unsigned int)phy_addr;
